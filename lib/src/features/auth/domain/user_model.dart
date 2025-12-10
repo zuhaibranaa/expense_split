@@ -28,4 +28,15 @@ class User {
       isVerified: json['is_verified'] == 1 || json['is_verified'] == true,
     );
   }
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'email': email,
+      'name': name,
+      'avatar_url': avatarUrl,
+      'default_currency': defaultCurrency,
+      'phone': phone,
+      'is_verified': isVerified,
+    };
+  }
 }

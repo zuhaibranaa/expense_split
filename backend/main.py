@@ -10,6 +10,19 @@ from typing import List
 import models, schemas
 from database import SessionLocal, engine, get_db
 import secrets
+import bcrypt
+
+# Password hashing config (using pure bcrypt to avoid passlib+bcrypt 5.0 issues)
+
+def verify_password(plain_password, hashed_password):
+    # bcrypt requires bytes
+    if isinstance(hashed_password, str):
+        hashed_password = hashed_password.encode('utf-8')
+    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password)
+
+def get_password_hash(password):
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
 
 # Create Tables
 models.Base.metadata.create_all(bind=engine)
@@ -47,21 +60,65 @@ conf = ConnectionConfig(
 def read_root():
     return {"message": "SettleUp Backend Running (FastAPI + SQLAlchemy)"}
 
+@app.on_event("startup")
+async def startup_event():
+    # Seed Demo User
+    db = SessionLocal()
+    try:
+        demo_email = "demo@example.com"
+        existing = db.query(models.User).filter(models.User.email == demo_email).first()
+        if not existing:
+            hashed_pwd = get_password_hash("demo123")
+            demo_user = models.User(
+                email=demo_email,
+                name="Demo User",
+                password_hash=hashed_pwd,
+                default_currency="USD",
+                avatar_url="https://ui-avatars.com/api/?name=Demo+User&background=random",
+                is_verified=True
+            )
+            db.add(demo_user)
+            db.commit()
+            print("--- DEMO USER SEEDED: demo@example.com / demo123 ---")
+    except Exception as e:
+        print(f"Error seeding demo user: {e}")
+    finally:
+        db.close()
+
 # Auth
+@app.post("/auth/check-email", response_model=schemas.EmailCheckResponse)
+def check_email(check: schemas.EmailCheckRequest, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == check.email).first()
+    return {"email": check.email, "exists": user is not None}
+
+@app.post("/auth/register", response_model=schemas.User)
+def register(user: schemas.UserRegister, db: Session = Depends(get_db)):
+    db_user = db.query(models.User).filter(models.User.email == user.email).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    hashed_password = get_password_hash(user.password)
+    db_user = models.User(
+        email=user.email,
+        name=user.name,
+        password_hash=hashed_password,
+        default_currency=user.currency,
+        avatar_url=f"https://ui-avatars.com/api/?name={user.name}&background=random"
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
 @app.post("/auth/login", response_model=schemas.User)
 def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
-    # Mock Login: Find or Create User by Email
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
     if not db_user:
-        db_user = models.User(
-            email=user.email,
-            name=user.name,
-            avatar_url=user.avatar_url,
-            default_currency=user.default_currency
-        )
-        db.add(db_user)
-        db.commit()
-        db.refresh(db_user)
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    if not verify_password(user.password, db_user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+        
     return db_user
 
 @app.get("/me/{user_id}", response_model=schemas.User)

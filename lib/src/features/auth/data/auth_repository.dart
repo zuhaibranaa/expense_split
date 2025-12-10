@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cross_file/cross_file.dart';
@@ -19,14 +20,17 @@ class AuthRepository {
 
   Future<User?> restoreSession() async {
     final prefs = await SharedPreferences.getInstance();
-    final uid = prefs.getString(_kUserIdKey);
-    if (uid != null) {
+    final userJsonString = prefs.getString('user_session'); // Changed key
+    if (userJsonString != null) {
       try {
-        final json = await _api.get('/me/$uid');
+        final json = jsonDecode(userJsonString);
         _currentUser = User.fromJson(json);
+        // Optionally, re-fetch user data to ensure it's up-to-date
+        // final updatedUserJson = await _api.get('/users/me/${_currentUser!.id}');
+        // _currentUser = User.fromJson(updatedUserJson);
         return _currentUser;
       } catch (e) {
-        // Session invalid
+        // Session invalid or parsing error
         await logout();
         return null;
       }
@@ -34,16 +38,46 @@ class AuthRepository {
     return null;
   }
 
-  Future<void> loginMock(String email, String name) async {
-    final json = await _api.post('/auth/login', {
+  Future<bool> checkEmail(String email) async {
+    try {
+      final response = await _api.post('/auth/check-email', {
+        'email': email,
+      }); // Removed 'exists: false' from payload
+      return response['exists'] as bool;
+    } catch (e) {
+      // If error, assume false or rethrow. For now rethrow to handle in UI
+      rethrow;
+    }
+  }
+
+  Future<void> login(String email, String password) async {
+    final response = await _api.post('/auth/login', {
       'email': email,
-      'name': name,
-      'avatar_url': 'https://ui-avatars.com/api/?name=$name&background=random',
-      'default_currency': 'USD',
+      'password': password,
     });
-    _currentUser = User.fromJson(json);
+    _currentUser = User.fromJson(response);
+    await _saveSession(_currentUser!);
+  }
+
+  Future<void> register(
+    String email,
+    String password,
+    String name,
+    String currency,
+  ) async {
+    final response = await _api.post('/auth/register', {
+      'email': email,
+      'password': password,
+      'name': name,
+      'currency': currency,
+    });
+    _currentUser = User.fromJson(response);
+    await _saveSession(_currentUser!);
+  }
+
+  Future<void> _saveSession(User user) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kUserIdKey, _currentUser!.id.toString());
+    await prefs.setString('user_session', jsonEncode(user.toJson()));
   }
 
   Future<void> updateProfile({
@@ -54,14 +88,16 @@ class AuthRepository {
   }) async {
     if (_currentUser == null) return;
 
-    final json = await _api.put('/me/${_currentUser!.id}', {
+    final response = await _api.put('/me/${_currentUser!.id}', {
+      'email': _currentUser!.email, // Required by backend schema
       'name': name ?? _currentUser!.name,
-      'email': _currentUser!.email,
       'avatar_url': avatarUrl ?? _currentUser!.avatarUrl,
       'default_currency': currency ?? _currentUser!.defaultCurrency,
       'phone': phone ?? _currentUser!.phone,
     });
-    _currentUser = User.fromJson(json);
+
+    _currentUser = User.fromJson(response);
+    await _saveSession(_currentUser!);
   }
 
   Future<String> uploadAvatar(XFile file) async {
@@ -95,30 +131,57 @@ class AuthRepository {
     _currentUser = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kUserIdKey);
+    await prefs.remove('user_session'); // Also remove the user session
   }
 }
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  final api = ref.watch(apiClientProvider);
-  return AuthRepository(api);
+  return AuthRepository(ref.watch(apiClientProvider));
 });
 
-// AsyncNotifier to handle Auth State changes reactively
-class AuthController extends AutoDisposeAsyncNotifier<User?> {
-  @override
-  Future<User?> build() async {
-    // Initial load
-    final repo = ref.watch(authRepositoryProvider);
-    return repo.restoreSession();
+final authControllerProvider =
+    StateNotifierProvider<AuthController, AsyncValue<User?>>((ref) {
+      return AuthController(ref);
+    });
+
+class AuthController extends StateNotifier<AsyncValue<User?>> {
+  final Ref ref;
+  AuthController(this.ref) : super(const AsyncValue.loading()) {
+    _init();
   }
 
-  Future<void> login(String email, String name) async {
+  Future<void> _init() async {
+    final repo = ref.read(authRepositoryProvider);
+    final user = await repo.restoreSession();
+    state = AsyncValue.data(user);
+  }
+
+  Future<void> login(String email, String password) async {
+    final repo = ref.read(authRepositoryProvider);
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
-      final repo = ref.read(authRepositoryProvider);
-      await repo.loginMock(email, name);
+      await repo.login(email, password);
       return repo.currentUser;
     });
+  }
+
+  Future<void> register(
+    String email,
+    String password,
+    String name,
+    String currency,
+  ) async {
+    final repo = ref.read(authRepositoryProvider);
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      await repo.register(email, password, name, currency);
+      return repo.currentUser;
+    });
+  }
+
+  Future<bool> checkEmail(String email) async {
+    final repo = ref.read(authRepositoryProvider);
+    return await repo.checkEmail(email);
   }
 
   Future<void> updateProfile({
@@ -163,8 +226,3 @@ class AuthController extends AutoDisposeAsyncNotifier<User?> {
     state = const AsyncValue.data(null);
   }
 }
-
-final authControllerProvider =
-    AsyncNotifierProvider.autoDispose<AuthController, User?>(() {
-      return AuthController();
-    });

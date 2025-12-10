@@ -9,8 +9,22 @@ class UserBase(BaseModel):
     default_currency: str = "USD"
     phone: Optional[str] = None
 
-class UserLogin(UserBase):
-    pass
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class UserRegister(BaseModel):
+    email: str
+    password: str
+    name: str
+    currency: str = "USD"
+
+class EmailCheckRequest(BaseModel):
+    email: str
+
+class EmailCheckResponse(BaseModel):
+    email: str
+    exists: bool
 
 class User(UserBase):
     id: int
