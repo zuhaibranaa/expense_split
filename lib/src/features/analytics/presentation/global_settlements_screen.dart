@@ -15,7 +15,7 @@ class GlobalSettlementItem {
   final Member me;
   final Member other;
   final double amount; // Positive if I am owed, Negative if I owe
-  
+
   GlobalSettlementItem({
     required this.groupId,
     required this.groupName,
@@ -26,59 +26,75 @@ class GlobalSettlementItem {
   });
 }
 
-final globalSettlementsProvider = FutureProvider.autoDispose<List<GlobalSettlementItem>>((ref) async {
-  final user = ref.watch(authControllerProvider).value;
-  if (user == null) return [];
+final globalSettlementsProvider =
+    FutureProvider.autoDispose<List<GlobalSettlementItem>>((ref) async {
+      final user = ref.watch(authControllerProvider).value;
+      if (user == null) return [];
 
-  final groups = await ref.watch(groupsRepositoryProvider).getGroups();
-  final items = <GlobalSettlementItem>[];
+      final groups = await ref
+          .watch(groupsRepositoryProvider)
+          .getGroups(user.id);
+      final items = <GlobalSettlementItem>[];
 
-  // Parallel fetch for efficiency
-  await Future.wait(groups.map((group) async {
-    final membersRepo = ref.read(membersRepositoryProvider);
-    final expensesRepo = ref.read(expensesRepositoryProvider);
+      // Parallel fetch for efficiency
+      await Future.wait(
+        groups.map((group) async {
+          final membersRepo = ref.read(membersRepositoryProvider);
+          final expensesRepo = ref.read(expensesRepositoryProvider);
 
-    final members = await membersRepo.getMembers(group.id);
-    // Find myself in this group
-    final me = members.firstWhere(
-      (m) => m.userId == user.id,
-      orElse: () => Member(id: -1, groupId: group.id, name: ''),
-    );
+          final members = await membersRepo.getMembers(group.id);
+          // Find myself in this group
+          final me = members.firstWhere(
+            (m) => m.userId == user.id,
+            orElse: () => Member(id: -1, groupId: group.id, name: ''),
+          );
 
-    if (me.id == -1) return; // Not a member of this group
+          if (me.id == -1) return; // Not a member of this group
 
-    final expenses = await expensesRepo.getExpensesList(group.id);
-    final transfers = BalanceCalculator.calculateBalances(expenses, members);
+          final expenses = await expensesRepo.getExpensesList(group.id);
+          final transfers = BalanceCalculator.calculateBalances(
+            expenses,
+            members,
+          );
 
-    for (var transfer in transfers) {
-      if (transfer.fromMemberId == me.id) {
-        // I owe someone
-        final other = members.firstWhere((m) => m.id == transfer.toMemberId);
-        items.add(GlobalSettlementItem(
-          groupId: group.id,
-          groupName: group.name,
-          groupCurrency: group.currency,
-          me: me,
-          other: other,
-          amount: -transfer.amount, // Negative for debt
-        ));
-      } else if (transfer.toMemberId == me.id) {
-        // Someone owes me
-        final other = members.firstWhere((m) => m.id == transfer.fromMemberId);
-        items.add(GlobalSettlementItem(
-          groupId: group.id,
-          groupName: group.name,
-          groupCurrency: group.currency,
-          me: me,
-          other: other,
-          amount: transfer.amount, // Positive for credit
-        ));
-      }
-    }
-  }));
+          for (var transfer in transfers) {
+            if (transfer.fromMemberId == me.id) {
+              // I owe someone
+              final other = members.firstWhere(
+                (m) => m.id == transfer.toMemberId,
+              );
+              items.add(
+                GlobalSettlementItem(
+                  groupId: group.id,
+                  groupName: group.name,
+                  groupCurrency: group.currency,
+                  me: me,
+                  other: other,
+                  amount: -transfer.amount, // Negative for debt
+                ),
+              );
+            } else if (transfer.toMemberId == me.id) {
+              // Someone owes me
+              final other = members.firstWhere(
+                (m) => m.id == transfer.fromMemberId,
+              );
+              items.add(
+                GlobalSettlementItem(
+                  groupId: group.id,
+                  groupName: group.name,
+                  groupCurrency: group.currency,
+                  me: me,
+                  other: other,
+                  amount: transfer.amount, // Positive for credit
+                ),
+              );
+            }
+          }
+        }),
+      );
 
-  return items;
-});
+      return items;
+    });
 
 class GlobalSettlementsScreen extends ConsumerWidget {
   const GlobalSettlementsScreen({super.key});
@@ -88,9 +104,7 @@ class GlobalSettlementsScreen extends ConsumerWidget {
     final settlementsAsync = ref.watch(globalSettlementsProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Settlements'),
-      ),
+      appBar: AppBar(title: const Text('My Settlements')),
       body: settlementsAsync.when(
         data: (items) {
           if (items.isEmpty) {
@@ -98,9 +112,16 @@ class GlobalSettlementsScreen extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.check_circle_outline, size: 64, color: Colors.green),
+                  Icon(
+                    Icons.check_circle_outline,
+                    size: 64,
+                    color: Colors.green,
+                  ),
                   SizedBox(height: 16),
-                  Text('You are all settled up!', style: TextStyle(fontSize: 18)),
+                  Text(
+                    'You are all settled up!',
+                    style: TextStyle(fontSize: 18),
+                  ),
                 ],
               ),
             );
@@ -126,43 +147,52 @@ class GlobalSettlementsScreen extends ConsumerWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            margin: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(4),
+                              color: Colors.blue.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.blue.shade300),
                             ),
                             child: Text(
                               item.groupName,
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue.shade800,
+                              ),
                             ),
                           ),
                           if (!isOwesMe) // Only show settle button if I owe
-                           OutlinedButton.icon(
-                             onPressed: () async {
-                               await Navigator.of(context).push(
-                                 MaterialPageRoute(
-                                   builder: (context) => SettleUpScreen(
-                                     groupId: item.groupId,
-                                     payer: item.me,
-                                     receiver: item.other,
-                                     amount: amount,
-                                     groupCurrency: item.groupCurrency,
-                                   ),
-                                 ),
-                               );
-                               // Refresh list
-                               ref.refresh(globalSettlementsProvider);
-                             },
-                             icon: const Icon(Icons.payment, size: 16),
-                             label: const Text('Pay'),
-                             style: OutlinedButton.styleFrom(
-                               visualDensity: VisualDensity.compact,
-                             ),
-                           ),
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => SettleUpScreen(
+                                      groupId: item.groupId,
+                                      payer: item.me,
+                                      receiver: item.other,
+                                      amount: amount,
+                                      groupCurrency: item.groupCurrency,
+                                    ),
+                                  ),
+                                );
+                                // Refresh list
+                                ref.refresh(globalSettlementsProvider);
+                              },
+                              icon: const Icon(Icons.payment, size: 16),
+                              label: const Text('Pay'),
+                              style: OutlinedButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
                         ],
                       ),
                       const SizedBox(height: 12),
-                      
+
                       // Debt Details
                       Row(
                         children: [
@@ -176,9 +206,9 @@ class GlobalSettlementsScreen extends ConsumerWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  isOwesMe 
-                                    ? '${item.other.name} owes you'
-                                    : 'You owe ${item.other.name}',
+                                  isOwesMe
+                                      ? '${item.other.name} owes you'
+                                      : 'You owe ${item.other.name}',
                                   style: const TextStyle(fontSize: 16),
                                 ),
                                 Text(

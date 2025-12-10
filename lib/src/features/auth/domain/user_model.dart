@@ -4,6 +4,8 @@ class User {
   final String name;
   final String? avatarUrl;
   final String defaultCurrency;
+  final String? phone;
+  final bool isVerified;
 
   User({
     required this.id,
@@ -11,6 +13,8 @@ class User {
     required this.name,
     this.avatarUrl,
     required this.defaultCurrency,
+    this.phone,
+    this.isVerified = false,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -20,6 +24,8 @@ class User {
       name: json['name'],
       avatarUrl: json['avatar_url'],
       defaultCurrency: json['default_currency'] ?? 'USD',
+      phone: json['phone'],
+      isVerified: json['is_verified'] == 1 || json['is_verified'] == true,
     );
   }
 }

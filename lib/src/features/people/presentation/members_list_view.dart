@@ -33,7 +33,30 @@ class MembersListView extends ConsumerWidget {
                 return ListTile(
                   leading: CircleAvatar(child: Text(member.name[0].toUpperCase())),
                   title: Text(member.name),
-                  subtitle: member.userId != null ? const Text('Verified User', style: TextStyle(fontSize: 12, color: Colors.green)) : null,
+                  subtitle: Row(
+                    children: [
+                      if (member.isAdmin == 1)
+                        Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.blue.shade300),
+                          ),
+                          child: Text(
+                            'Admin',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue.shade800,
+                            ),
+                          ),
+                        ),
+                      if (member.userId != null) 
+                        const Text('Verified User', style: TextStyle(fontSize: 12, color: Colors.green)),
+                    ],
+                  ),
                   trailing: member.userId == null
                       ? IconButton(
                           icon: const Icon(Icons.link),
@@ -65,24 +88,43 @@ class MembersListView extends ConsumerWidget {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Invite Link'),
+            title: const Text('Invite Member'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('Share this link with the person you want to invite:'),
+                const Text('Share this code with the person you want to invite:', textAlign: TextAlign.center),
                 const SizedBox(height: 16),
-                SelectableText(link, style: const TextStyle(fontWeight: FontWeight.bold)),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade400),
+                  ),
+                  child: Center(
+                    child: SelectableText(
+                      token,
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text('Enter this code in "Join Group"', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+                const Divider(),
+                const Text('Or share link:', style: TextStyle(fontSize: 12)),
+                SelectableText(link, style: const TextStyle(fontSize: 12, color: Colors.blue)),
               ],
             ),
             actions: [
               TextButton.icon(
                 onPressed: () {
-                  Clipboard.setData(ClipboardData(text: link));
+                  Clipboard.setData(ClipboardData(text: token));
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied!')));
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code copied!')));
                 },
                 icon: const Icon(Icons.copy),
-                label: const Text('Copy'),
+                label: const Text('Copy Code'),
               ),
               TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
             ],

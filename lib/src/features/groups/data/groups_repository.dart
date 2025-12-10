@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/group_model.dart';
 import '../../../shared/data/api_client.dart';
+import '../../auth/data/auth_repository.dart';
 
 class GroupsRepository {
   final ApiClient _api;
@@ -17,8 +18,8 @@ class GroupsRepository {
     // For now, we rely on refetching.
   }
 
-  Future<List<Group>> getGroups() async {
-    final List<dynamic> json = await _api.get('/groups/');
+  Future<List<Group>> getGroups(int? userId) async {
+    final List<dynamic> json = await _api.get('/groups/${userId != null ? "?user_id=$userId" : ""}');
     return json.map((e) => Group.fromJson(e)).toList();
   }
 
@@ -54,12 +55,19 @@ final groupsRepositoryProvider = Provider<GroupsRepository>((ref) {
 
 final groupsListStreamProvider = StreamProvider.autoDispose<List<Group>>((ref) async* {
   final repo = ref.watch(groupsRepositoryProvider);
-  // Initial fetch
-  yield await repo.getGroups();
+  final user = ref.watch(authControllerProvider).value;
+
+  if (user == null) {
+    yield [];
+    return;
+  }
   
-  // Simple polling every 5 seconds for updates (since we lack WebSockets for now)
-  // This simulates the "Live" feel of Drift/Firestore
+  // Initial fetch
+  yield await repo.getGroups(user.id);
+  
+  // Simple polling
   await for (final _ in Stream.periodic(const Duration(seconds: 5))) {
-    yield await repo.getGroups();
+    // Check if mounted/active? (StreamProvider handles dispose)
+    yield await repo.getGroups(user.id);
   }
 });

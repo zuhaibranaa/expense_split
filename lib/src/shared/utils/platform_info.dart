@@ -74,12 +74,10 @@ class PlatformInfo {
   static String getDefaultApiBaseUrl() {
     if (isWeb || isDesktop) {
       return 'http://localhost:8000';
-    } else if (isAndroid) {
-      // Android emulator uses 10.0.2.2 to access host machine's localhost
-      return 'http://10.0.2.2:8000';
-    } else if (isIOS) {
-      // iOS simulator can use localhost
-      return 'http://localhost:8000';
+    } else if (isAndroid || isIOS) {
+      // Use local IP for physical devices and emulators
+      // Replace with your machine's local IP
+      return 'http://192.168.1.2:8000';
     }
     // Fallback
     return 'http://localhost:8000';

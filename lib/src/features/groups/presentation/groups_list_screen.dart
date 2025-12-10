@@ -85,10 +85,12 @@ class GroupsListScreen extends ConsumerWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                group.name,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                              ),
+                                Text(
+                                  group.name,
+                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               const SizedBox(height: 4),
                               Text(
                                 'Created ${_formatDate(group.createdAt)}',

@@ -13,3 +13,11 @@ services:
     environment:
       - DATABASE_URL=sqlite:///./settleup.db
     restart: unless-stopped
+  
+  mailpit:
+    image: axllent/mailpit
+    container_name: settleup-mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+      - "1025:1025"

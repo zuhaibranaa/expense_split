@@ -11,6 +11,9 @@ class User(Base):
     name = Column(String)
     avatar_url = Column(String)
     default_currency = Column(String, default="USD")
+    phone = Column(String, nullable=True)
+    is_verified = Column(Integer, default=0) # 0 for false, 1 for true
+    verification_token = Column(String, nullable=True)
 
 class Group(Base):
     __tablename__ = "groups"

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../../groups/data/groups_repository.dart';
-import '../../expenses/data/expenses_repository.dart';
-import '../../expenses/domain/expense_model.dart';
+import 'package:settle_up_clone/src/features/groups/data/groups_repository.dart';
+import 'package:settle_up_clone/src/features/expenses/data/expenses_repository.dart';
+import 'package:settle_up_clone/src/features/expenses/domain/expense_model.dart';
+import 'package:settle_up_clone/src/features/auth/data/auth_repository.dart';
 
 class StatsScreen extends ConsumerWidget {
   const StatsScreen({super.key});
@@ -46,6 +47,7 @@ class _StatsContentState extends ConsumerState<_StatsContent> {
 
   @override
   Widget build(BuildContext context) {
+    final userCurrency = ref.watch(authControllerProvider).value?.defaultCurrency ?? 'USD';
     final allExpensesAsync = ref.watch(allGroupsExpensesProvider(widget.groupIds));
 
     return allExpensesAsync.when(
@@ -104,7 +106,7 @@ class _StatsContentState extends ConsumerState<_StatsContent> {
                            crossAxisAlignment: CrossAxisAlignment.start,
                            children: [
                              Text('Total Spending', style: TextStyle(color: Colors.grey[400])),
-                             Text('\$${totalSpending.toStringAsFixed(2)}', 
+                             Text('$userCurrency ${totalSpending.toStringAsFixed(2)}', 
                                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
                            ],
                          ),
@@ -118,7 +120,7 @@ class _StatsContentState extends ConsumerState<_StatsContent> {
                         children: [
                           _buildStatItem('Expenses', expenses.length.toString()),
                           _buildStatItem('Groups', widget.groupIds.length.toString()),
-                          _buildStatItem('Avg/Expense', '\$${avgExpense.toStringAsFixed(0)}'),
+                          _buildStatItem('Avg/Expense', '$userCurrency ${avgExpense.toStringAsFixed(0)}'),
                         ],
                       )
                    ],
@@ -152,7 +154,7 @@ class _StatsContentState extends ConsumerState<_StatsContent> {
                        child: Column(
                          mainAxisSize: MainAxisSize.min,
                          children: [
-                            Text('\$${totalSpending.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                            Text('$userCurrency ${totalSpending.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                             const Text('Total', style: TextStyle(fontSize: 12, color: Colors.grey)),
                          ],
                        ),
@@ -171,7 +173,7 @@ class _StatsContentState extends ConsumerState<_StatsContent> {
                      Container(width: 10, height: 10, decoration: BoxDecoration(color: _getCategoryColor(e.key), shape: BoxShape.circle)),
                      const SizedBox(width: 8),
                      Expanded(child: Text(e.key)),
-                     Text('\$${e.value.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                     Text('$userCurrency ${e.value.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
                      const SizedBox(width: 16),
                      Text('${(e.value / totalSpending * 100).toStringAsFixed(0)}%', style: const TextStyle(color: Colors.grey)),
                    ],

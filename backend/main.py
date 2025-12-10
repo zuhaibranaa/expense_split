@@ -1,4 +1,9 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, File, UploadFile
+from fastapi.staticfiles import StaticFiles
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
+from pydantic import EmailStr
+import shutil
+import os
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -20,6 +25,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Static Files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Mail Configuration
+conf = ConnectionConfig(
+    MAIL_USERNAME="",
+    MAIL_PASSWORD="",
+    MAIL_FROM="noreply@settleup.com",
+    MAIL_PORT=1025,
+    MAIL_SERVER="localhost",
+    MAIL_STARTTLS=False,
+    MAIL_SSL_TLS=False,
+    USE_CREDENTIALS=False,
+    VALIDATE_CERTS=False
+)
+
 
 @app.get("/")
 def read_root():
@@ -58,10 +80,69 @@ def update_user_me(user_id: int, user_update: schemas.UserBase, db: Session = De
     db_user.name = user_update.name
     db_user.avatar_url = user_update.avatar_url
     db_user.default_currency = user_update.default_currency
+    db_user.phone = user_update.phone
     
     db.commit()
     db.refresh(db_user)
     return db_user
+
+@app.post("/auth/verify-request")
+async def request_verification(email: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if user.is_verified:
+        return {"message": "Already verified"}
+
+    token = secrets.token_urlsafe(32)
+    user.verification_token = token
+    db.commit()
+
+    message = MessageSchema(
+        subject="Verify your SettleUp Email",
+        recipients=[email],
+        body=f"Click here to verify: http://localhost:8000/auth/verify?token={token}",
+        subtype=MessageType.html
+    )
+
+    print(f"--- EMAIL VERIFICATION ---\nTo verify: http://localhost:8000/auth/verify?token={token}\n--------------------------")
+
+    fm = FastMail(conf)
+    try:
+        background_tasks.add_task(fm.send_message, message)
+    except Exception as e:
+        print(f"Failed to send email (Mailpit might be down): {e}")
+
+    return {"message": "Verification email sent (check console if Mailpit unavailable)"}
+
+@app.get("/auth/verify")
+def verify_email(token: str, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.verification_token == token).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid token")
+    
+    user.is_verified = 1
+    user.verification_token = None
+    db.commit()
+    
+    return {"message": "Email verified successfully"}
+
+@app.post("/upload/image")
+async def upload_image(file: UploadFile = File(...)):
+    # Create directory if not exists (safety check)
+    os.makedirs("static/images", exist_ok=True)
+    
+    # Generate unique filename to avoid collisions
+    file_ext = os.path.splitext(file.filename)[1]
+    filename = f"{secrets.token_hex(8)}{file_ext}"
+    file_location = f"static/images/{filename}"
+    
+    with open(file_location, "wb+") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    # Return full URL assuming local dev
+    return {"url": f"http://localhost:8000/{file_location}"}
 
 # Groups CRUD
 @app.post("/groups/", response_model=schemas.Group)
@@ -94,8 +175,12 @@ def create_group(group: schemas.GroupCreate, db: Session = Depends(get_db)):
     return db_group
 
 @app.get("/groups/", response_model=List[schemas.Group])
-def read_groups(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    groups = db.query(models.Group).offset(skip).limit(limit).all()
+def read_groups(skip: int = 0, limit: int = 100, user_id: int = None, db: Session = Depends(get_db)):
+    query = db.query(models.Group)
+    if user_id:
+        query = query.join(models.Member).filter(models.Member.user_id == user_id)
+    
+    groups = query.offset(skip).limit(limit).all()
     return groups
 
 @app.get("/groups/{group_id}", response_model=schemas.Group)

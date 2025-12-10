@@ -7,12 +7,14 @@ class UserBase(BaseModel):
     name: str
     avatar_url: Optional[str] = None
     default_currency: str = "USD"
+    phone: Optional[str] = None
 
 class UserLogin(UserBase):
     pass
 
 class User(UserBase):
     id: int
+    is_verified: bool = False
     class Config:
         from_attributes = True
 

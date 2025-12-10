@@ -13,7 +13,8 @@ class GroupSettingsScreen extends ConsumerStatefulWidget {
   const GroupSettingsScreen({super.key, required this.group});
 
   @override
-  ConsumerState<GroupSettingsScreen> createState() => _GroupSettingsScreenState();
+  ConsumerState<GroupSettingsScreen> createState() =>
+      _GroupSettingsScreenState();
 }
 
 class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
@@ -23,10 +24,18 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
     final user = ref.read(authControllerProvider).value;
     if (user == null) return null;
 
-    final members = await ref.read(membersStreamProvider(widget.group.id).future);
+    final members = await ref.read(
+      membersStreamProvider(widget.group.id).future,
+    );
     return members.firstWhere(
       (m) => m.userId == user.id,
-      orElse: () => Member(id: -1, groupId: widget.group.id, name: '', userId: null, isAdmin: 0),
+      orElse: () => Member(
+        id: -1,
+        groupId: widget.group.id,
+        name: '',
+        userId: null,
+        isAdmin: 0,
+      ),
     );
   }
 
@@ -54,7 +63,10 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Group Information', style: Theme.of(context).textTheme.titleLarge),
+                          Text(
+                            'Group Information',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
                           const SizedBox(height: 16),
                           ListTile(
                             leading: const Icon(Icons.group),
@@ -71,7 +83,8 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
                                 if (snapshot.data == true) {
                                   return IconButton(
                                     icon: const Icon(Icons.edit),
-                                    onPressed: () => _showChangeCurrencyDialog(),
+                                    onPressed: () =>
+                                        _showChangeCurrencyDialog(),
                                   );
                                 }
                                 return const SizedBox.shrink();
@@ -91,11 +104,16 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Members', style: Theme.of(context).textTheme.titleLarge),
+                          Text(
+                            'Members',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
                           const SizedBox(height: 8),
                           membersAsync.when(
                             data: (members) => Column(
-                              children: members.map((member) => _buildMemberTile(member)).toList(),
+                              children: members
+                                  .map((member) => _buildMemberTile(member))
+                                  .toList(),
                             ),
                             error: (e, s) => Text('Error: $e'),
                             loading: () => const CircularProgressIndicator(),
@@ -118,12 +136,22 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Danger Zone', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.red)),
+                                Text(
+                                  'Danger Zone',
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(color: Colors.red),
+                                ),
                                 const SizedBox(height: 16),
                                 OutlinedButton.icon(
                                   onPressed: () => _showDeleteGroupDialog(),
-                                  icon: const Icon(Icons.delete_forever, color: Colors.red),
-                                  label: const Text('Delete Group', style: TextStyle(color: Colors.red)),
+                                  icon: const Icon(
+                                    Icons.delete_forever,
+                                    color: Colors.red,
+                                  ),
+                                  label: const Text(
+                                    'Delete Group',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
                                   style: OutlinedButton.styleFrom(
                                     side: const BorderSide(color: Colors.red),
                                   ),
@@ -152,18 +180,34 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
 
         return ListTile(
           leading: CircleAvatar(
-            child: Text(member.name.isNotEmpty ? member.name[0].toUpperCase() : '?'),
+            child: Text(
+              member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
+            ),
           ),
           title: Row(
             children: [
               Text(member.name),
               if (member.isAdmin == 1) ...[
                 const SizedBox(width: 8),
-                Chip(
-                  label: const Text('Admin', style: TextStyle(fontSize: 10)),
-                  backgroundColor: Colors.blue.shade100,
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
+                Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue.shade300),
+                  ),
+                  child: Text(
+                    'Admin',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue.shade800,
+                    ),
+                  ),
                 ),
               ],
             ],
@@ -200,11 +244,9 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
           final user = ref.read(authControllerProvider).value;
           if (user == null) return;
 
-          await ref.read(groupsRepositoryProvider).updateGroup(
-                widget.group.id,
-                user.id,
-                currency: currency.code,
-              );
+          await ref
+              .read(groupsRepositoryProvider)
+              .updateGroup(widget.group.id, user.id, currency: currency.code);
 
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -246,7 +288,9 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
+                onPressed: isLoading
+                    ? null
+                    : () => Navigator.pop(dialogContext),
                 child: const Text('Cancel'),
               ),
               FilledButton(
@@ -260,19 +304,25 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
                           final user = ref.read(authControllerProvider).value;
                           if (user == null) return;
 
-                          await ref.read(membersRepositoryProvider).updateMember(
+                          await ref
+                              .read(membersRepositoryProvider)
+                              .updateMember(
                                 widget.group.id,
                                 member.id,
                                 user.id,
                                 name: nameController.text.trim(),
                               );
 
-                          if (dialogContext.mounted) Navigator.pop(dialogContext);
+                          if (dialogContext.mounted)
+                            Navigator.pop(dialogContext);
                         } catch (e) {
                           setState(() => isLoading = false);
                           if (dialogContext.mounted) {
                             ScaffoldMessenger.of(dialogContext).showSnackBar(
-                              SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                              SnackBar(
+                                content: Text('Error: $e'),
+                                backgroundColor: Colors.red,
+                              ),
                             );
                           }
                         }
@@ -281,7 +331,10 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
                     ? const SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : const Text('Save'),
               ),
@@ -297,7 +350,9 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Remove Member'),
-        content: Text('Are you sure you want to remove ${member.name} from this group?'),
+        content: Text(
+          'Are you sure you want to remove ${member.name} from this group?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
@@ -312,21 +367,24 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
                 final user = ref.read(authControllerProvider).value;
                 if (user == null) return;
 
-                await ref.read(membersRepositoryProvider).removeMember(
-                      widget.group.id,
-                      member.id,
-                      user.id,
-                    );
+                await ref
+                    .read(membersRepositoryProvider)
+                    .removeMember(widget.group.id, member.id, user.id);
 
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${member.name} removed from group')),
+                    SnackBar(
+                      content: Text('${member.name} removed from group'),
+                    ),
                   );
                 }
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                    ),
                   );
                 }
               } finally {
@@ -363,10 +421,9 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
                 final user = ref.read(authControllerProvider).value;
                 if (user == null) return;
 
-                await ref.read(groupsRepositoryProvider).deleteGroup(
-                      widget.group.id,
-                      user.id,
-                    );
+                await ref
+                    .read(groupsRepositoryProvider)
+                    .deleteGroup(widget.group.id, user.id);
 
                 if (mounted) {
                   Navigator.of(context).popUntil((route) => route.isFirst);
@@ -378,7 +435,10 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
                 if (mounted) {
                   setState(() => _isLoading = false);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                    ),
                   );
                 }
               }
