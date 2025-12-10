@@ -1,0 +1,65 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../domain/group_model.dart';
+import '../../../shared/data/api_client.dart';
+
+class GroupsRepository {
+  final ApiClient _api;
+
+  GroupsRepository(this._api);
+
+  Future<void> createGroup(String name, String currency, int creatorUserId) async {
+    await _api.post('/groups/', {
+      'name': name,
+      'currency': currency,
+      'creator_user_id': creatorUserId,
+    });
+    // Optimistic update or refresh handled by Stream/Future provider usually
+    // For now, we rely on refetching.
+  }
+
+  Future<List<Group>> getGroups() async {
+    final List<dynamic> json = await _api.get('/groups/');
+    return json.map((e) => Group.fromJson(e)).toList();
+  }
+
+  Future<void> updateGroup(int groupId, int userId, {String? name, String? currency}) async {
+    await _api.put('/groups/$groupId?user_id=$userId', {
+      if (name != null) 'name': name,
+      if (currency != null) 'currency': currency,
+    });
+  }
+
+  Future<void> deleteGroup(int groupId, int userId) async {
+    await _api.delete('/groups/$groupId?user_id=$userId');
+  }
+
+  Future<String> generateInvite(int groupId, int memberId, int userId) async {
+    final response = await _api.post('/groups/$groupId/members/$memberId/invite?user_id=$userId', {});
+    return response['token'];
+  }
+
+  Future<Map<String, dynamic>> claimInvite(String token, int userId) async {
+    final response = await _api.post('/invites/claim?user_id=$userId', {'token': token});
+    return response;
+  }
+}
+
+// Re-using the same provider name, but changing type to FutureProvider for simplicity with HTTP,
+// or StreamProvider if we poll/socket. Let's start with FutureProvider/polling.
+// Actually, UI expects Stream, so we can yield results periodically or just Stream.fromFuture.
+final groupsRepositoryProvider = Provider<GroupsRepository>((ref) {
+  final api = ref.watch(apiClientProvider);
+  return GroupsRepository(api);
+});
+
+final groupsListStreamProvider = StreamProvider.autoDispose<List<Group>>((ref) async* {
+  final repo = ref.watch(groupsRepositoryProvider);
+  // Initial fetch
+  yield await repo.getGroups();
+  
+  // Simple polling every 5 seconds for updates (since we lack WebSockets for now)
+  // This simulates the "Live" feel of Drift/Firestore
+  await for (final _ in Stream.periodic(const Duration(seconds: 5))) {
+    yield await repo.getGroups();
+  }
+});
