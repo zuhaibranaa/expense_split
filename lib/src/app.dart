@@ -9,6 +9,7 @@ class SettleUpApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'SettleUp Clone',
       navigatorKey: navigatorKey,
       theme: AppTheme.darkTheme,
