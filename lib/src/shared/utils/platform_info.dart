@@ -63,22 +63,7 @@ class PlatformInfo {
     }
   }
 
-  /// Returns the appropriate API base URL for the current platform
-  ///
-  /// - Web & Desktop: http://localhost:8000
-  /// - Android: http://10.0.2.2:8000 (emulator localhost)
-  /// - iOS: http://localhost:8000 (simulator can use localhost)
-  ///
-  /// Note: For physical devices, you'll need to configure the actual
-  /// IP address of your backend server.
   static String getDefaultApiBaseUrl() {
-    if (isWeb || isDesktop || isIOS) {
-      return 'http://127.0.0.1:8000';
-    } else if (isAndroid) {
-      // Use 10.0.2.2 for Android Emulator to access host localhost
-      return 'http://10.0.2.2:8000';
-    }
-    // Fallback
-    return 'http://127.0.0.1:8000';
+    return 'https://burl-roiliest-harry.ngrok-free.dev';
   }
 }
