@@ -30,41 +30,49 @@ class MembersListView extends ConsumerWidget {
             itemCount: members.length,
             itemBuilder: (context, index) {
               final member = members[index];
-                return ListTile(
-                  leading: CircleAvatar(child: Text(member.name[0].toUpperCase())),
-                  title: Text(member.name),
-                  subtitle: Row(
-                    children: [
-                      if (member.isAdmin == 1)
-                        Container(
-                          margin: const EdgeInsets.only(right: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade100,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.blue.shade300),
-                          ),
-                          child: Text(
-                            'Admin',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue.shade800,
-                            ),
+              return ListTile(
+                leading: CircleAvatar(
+                  child: Text(member.name[0].toUpperCase()),
+                ),
+                title: Text(member.name),
+                subtitle: Row(
+                  children: [
+                    if (member.isAdmin == 1)
+                      Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.blue.shade300),
+                        ),
+                        child: Text(
+                          'Admin',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade800,
                           ),
                         ),
-                      if (member.userId != null) 
-                        const Text('Verified User', style: TextStyle(fontSize: 12, color: Colors.green)),
-                    ],
-                  ),
-                  trailing: member.userId == null
-                      ? IconButton(
-                          icon: const Icon(Icons.link),
-                          tooltip: 'Invite Link',
-                          onPressed: () => _generateInvite(context, ref, member),
-                        )
-                      : null,
-                );
+                      ),
+                    if (member.userId != null)
+                      const Text(
+                        'Verified User',
+                        style: TextStyle(fontSize: 12, color: Colors.green),
+                      ),
+                  ],
+                ),
+                trailing: member.userId == null
+                    ? IconButton(
+                        icon: const Icon(Icons.link),
+                        tooltip: 'Invite Link',
+                        onPressed: () => _generateInvite(context, ref, member),
+                      )
+                    : null,
+              );
             },
           );
         },
@@ -74,15 +82,18 @@ class MembersListView extends ConsumerWidget {
     );
   }
 
-  Future<void> _generateInvite(BuildContext context, WidgetRef ref, Member member) async {
+  Future<void> _generateInvite(
+    BuildContext context,
+    WidgetRef ref,
+    Member member,
+  ) async {
     final currentUser = ref.read(authRepositoryProvider).currentUser;
     if (currentUser == null) return;
 
     try {
-      final token = await ref.read(groupsRepositoryProvider).generateInvite(groupId, member.id, currentUser.id);
-      
-      // Construct Link (Using relative path for web, would need real domain for mobile)
-      final link = '${Uri.base.origin}/invite?token=$token';
+      final token = await ref
+          .read(groupsRepositoryProvider)
+          .generateInvite(groupId, member.id, currentUser.id);
 
       if (context.mounted) {
         showDialog(
@@ -93,7 +104,10 @@ class MembersListView extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('Share this code with the person you want to invite:', textAlign: TextAlign.center),
+                const Text(
+                  'Share this code with the person you want to invite:',
+                  textAlign: TextAlign.center,
+                ),
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -105,15 +119,20 @@ class MembersListView extends ConsumerWidget {
                   child: Center(
                     child: SelectableText(
                       token,
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 2),
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2,
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text('Enter this code in "Join Group"', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
-                const Divider(),
-                const Text('Or share link:', style: TextStyle(fontSize: 12)),
-                SelectableText(link, style: const TextStyle(fontSize: 12, color: Colors.blue)),
+                const Text(
+                  'Enter this code in "Join Group"',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
+                ),
               ],
             ),
             actions: [
@@ -121,19 +140,26 @@ class MembersListView extends ConsumerWidget {
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: token));
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code copied!')));
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('Code copied!')));
                 },
                 icon: const Icon(Icons.copy),
                 label: const Text('Copy Code'),
               ),
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
             ],
           ),
         );
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -146,16 +172,24 @@ class MembersListView extends ConsumerWidget {
         title: const Text('Add Person'),
         content: TextField(
           controller: nameController,
-          decoration: const InputDecoration(labelText: 'Name', hintText: 'e.g. Alice'),
+          decoration: const InputDecoration(
+            labelText: 'Name',
+            hintText: 'e.g. Alice',
+          ),
           textCapitalization: TextCapitalization.words,
           autofocus: true,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () {
               if (nameController.text.isNotEmpty) {
-                ref.read(membersRepositoryProvider).addMember(groupId, nameController.text);
+                ref
+                    .read(membersRepositoryProvider)
+                    .addMember(groupId, nameController.text);
                 Navigator.pop(context);
               }
             },
@@ -166,4 +200,3 @@ class MembersListView extends ConsumerWidget {
     );
   }
 }
-
