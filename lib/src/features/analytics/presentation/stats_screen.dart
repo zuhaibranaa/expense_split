@@ -15,17 +15,15 @@ class StatsScreen extends ConsumerWidget {
     final groupsAsync = ref.watch(groupsListStreamProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Statistics'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Statistics'), centerTitle: true),
       body: groupsAsync.when(
         data: (groups) {
-           if (groups.isEmpty) return const Center(child: Text("No groups found"));
-           
-           // 2. Fetch Expenses for All Groups (MVP Approach: Client-side Aggregation)
-           // In a real app, use a dedicated endpoint /stats
-           return _StatsContent(groupIds: groups.map((g) => g.id).toList());
+          if (groups.isEmpty)
+            return const Center(child: Text("No groups found"));
+
+          // 2. Fetch Expenses for All Groups (MVP Approach: Client-side Aggregation)
+          // In a real app, use a dedicated endpoint /stats
+          return _StatsContent(groupIds: groups.map((g) => g.id).toList());
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, st) => Center(child: Text('Error: $e')),
@@ -43,18 +41,25 @@ class _StatsContent extends ConsumerStatefulWidget {
 }
 
 class _StatsContentState extends ConsumerState<_StatsContent> {
-  int _periodIndex = 2; // 0: Month, 1: Quarter, 2: Year DEFAULTS to YEAR as per screenshot
+  int _periodIndex =
+      2; // 0: Month, 1: Quarter, 2: Year DEFAULTS to YEAR as per screenshot
 
   @override
   Widget build(BuildContext context) {
-    final userCurrency = ref.watch(authControllerProvider).value?.defaultCurrency ?? 'USD';
-    final allExpensesAsync = ref.watch(allGroupsExpensesProvider(widget.groupIds));
+    final userCurrency =
+        ref.watch(authControllerProvider).value?.defaultCurrency ?? 'USD';
+    final groupIdsString = widget.groupIds.join(',');
+    final allExpensesAsync = ref.watch(
+      allGroupsExpensesProvider(groupIdsString),
+    );
 
     return allExpensesAsync.when(
       data: (expenses) {
         final totalSpending = expenses.fold(0.0, (sum, e) => sum + e.amount);
-        final avgExpense = expenses.isEmpty ? 0.0 : totalSpending / expenses.length;
-        
+        final avgExpense = expenses.isEmpty
+            ? 0.0
+            : totalSpending / expenses.length;
+
         // Calculate Category Data
         final categoryMap = <String, double>{};
         for (var e in expenses) {
@@ -68,117 +73,180 @@ class _StatsContentState extends ConsumerState<_StatsContent> {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-               // Period Selector using Segmented Button styled manually or standard
-               ToggleButtons(
-                 isSelected: [_periodIndex == 0, _periodIndex == 1, _periodIndex == 2],
-                 onPressed: (index) => setState(() => _periodIndex = index),
-                 borderRadius: BorderRadius.circular(20),
-                 children: const [
-                   Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Text('Month')),
-                   Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Text('Quarter')),
-                   Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Text('Year')),
-                 ],
-               ),
-               const SizedBox(height: 24),
+              // Period Selector using Segmented Button styled manually or standard
+              ToggleButtons(
+                isSelected: [
+                  _periodIndex == 0,
+                  _periodIndex == 1,
+                  _periodIndex == 2,
+                ],
+                onPressed: (index) => setState(() => _periodIndex = index),
+                borderRadius: BorderRadius.circular(20),
+                children: const [
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: Text('Month'),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: Text('Quarter'),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: Text('Year'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
 
-               // Total Spending Card
-               Container(
-                 padding: const EdgeInsets.all(24),
-                 decoration: BoxDecoration(
-                   color: const Color(0xFF1E2235), // Dark card bg
-                   borderRadius: BorderRadius.circular(24),
-                 ),
-                 child: Column(
-                   children: [
-                     Row(
-                       mainAxisAlignment: MainAxisAlignment.center,
-                       children: [
-                         Container(
-                           padding: const EdgeInsets.all(8),
-                           decoration: BoxDecoration(
-                             color: Colors.cyan.withOpacity(0.2),
-                             borderRadius: BorderRadius.circular(12),
-                           ),
-                           child: const Icon(Icons.trending_up, color: Colors.cyan),
-                         ),
-                         const SizedBox(width: 16),
-                         Column(
-                           crossAxisAlignment: CrossAxisAlignment.start,
-                           children: [
-                             Text('Total Spending', style: TextStyle(color: Colors.grey[400])),
-                             Text('$userCurrency ${totalSpending.toStringAsFixed(2)}', 
-                               style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
-                           ],
-                         ),
-                       ],
+              // Total Spending Card
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E2235), // Dark card bg
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.cyan.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.trending_up,
+                            color: Colors.cyan,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Total Spending',
+                              style: TextStyle(color: Colors.grey[400]),
+                            ),
+                            Text(
+                              '$userCurrency ${totalSpending.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    const Divider(color: Colors.white10),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildStatItem('Expenses', expenses.length.toString()),
+                        _buildStatItem(
+                          'Groups',
+                          widget.groupIds.length.toString(),
+                        ),
+                        _buildStatItem(
+                          'Avg/Expense',
+                          '$userCurrency ${avgExpense.toStringAsFixed(0)}',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 32),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'By Category',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Donut Chart
+              SizedBox(
+                height: 200,
+                child: Stack(
+                  children: [
+                    PieChart(
+                      PieChartData(
+                        sectionsSpace: 0,
+                        centerSpaceRadius: 40,
+                        sections: sortedCategories.map((e) {
+                          return PieChartSectionData(
+                            color: _getCategoryColor(e.key),
+                            value: e.value,
+                            title: '',
+                            radius: 20,
+                          );
+                        }).toList(),
                       ),
-                      const SizedBox(height: 24),
-                      const Divider(color: Colors.white10),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    ),
+                    Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          _buildStatItem('Expenses', expenses.length.toString()),
-                          _buildStatItem('Groups', widget.groupIds.length.toString()),
-                          _buildStatItem('Avg/Expense', '$userCurrency ${avgExpense.toStringAsFixed(0)}'),
+                          Text(
+                            '$userCurrency ${totalSpending.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                          const Text(
+                            'Total',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
                         ],
-                      )
-                   ],
-                 ),
-               ),
-               
-               const SizedBox(height: 32),
-               const Align(alignment: Alignment.centerLeft, child: Text('By Category', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
-               const SizedBox(height: 16),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
-               // Donut Chart
-               SizedBox(
-                 height: 200,
-                 child: Stack(
-                   children: [
-                     PieChart(
-                       PieChartData(
-                         sectionsSpace: 0,
-                         centerSpaceRadius: 40,
-                         sections: sortedCategories.map((e) {
-                           return PieChartSectionData(
-                             color: _getCategoryColor(e.key),
-                             value: e.value,
-                             title: '',
-                             radius: 20,
-                           );
-                         }).toList(),
-                       ),
-                     ),
-                     Center(
-                       child: Column(
-                         mainAxisSize: MainAxisSize.min,
-                         children: [
-                            Text('$userCurrency ${totalSpending.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                            const Text('Total', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                         ],
-                       ),
-                     ),
-                   ],
-                 ),
-               ),
-               
-               const SizedBox(height: 16),
-               
-               // Category List
-               ...sortedCategories.map((e) => Padding(
-                 padding: const EdgeInsets.symmetric(vertical: 8.0),
-                 child: Row(
-                   children: [
-                     Container(width: 10, height: 10, decoration: BoxDecoration(color: _getCategoryColor(e.key), shape: BoxShape.circle)),
-                     const SizedBox(width: 8),
-                     Expanded(child: Text(e.key)),
-                     Text('$userCurrency ${e.value.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                     const SizedBox(width: 16),
-                     Text('${(e.value / totalSpending * 100).toStringAsFixed(0)}%', style: const TextStyle(color: Colors.grey)),
-                   ],
-                 ),
-               )).toList(),
+              const SizedBox(height: 16),
+
+              // Category List
+              ...sortedCategories
+                  .map(
+                    (e) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: _getCategoryColor(e.key),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(e.key)),
+                          Text(
+                            '$userCurrency ${e.value.toStringAsFixed(0)}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(width: 16),
+                          Text(
+                            '${(e.value / totalSpending * 100).toStringAsFixed(0)}%',
+                            style: const TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
             ],
           ),
         );
@@ -193,31 +261,50 @@ class _StatsContentState extends ConsumerState<_StatsContent> {
       children: [
         Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
         const SizedBox(height: 4),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(
+          value,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
       ],
     );
   }
 
   Color _getCategoryColor(String category) {
     switch (category) {
-      case 'Housing': return Colors.teal;
-      case 'Transport': return Colors.blue;
-      case 'Utilities': return Colors.purple;
-      case 'Food & Drinks': return Colors.orange;
-      case 'Entertainment': return Colors.pink;
-      default: return Colors.grey;
+      case 'Housing':
+        return Colors.teal;
+      case 'Transport':
+        return Colors.blue;
+      case 'Utilities':
+        return Colors.purple;
+      case 'Food & Drinks':
+        return Colors.orange;
+      case 'Entertainment':
+        return Colors.pink;
+      default:
+        return Colors.grey;
     }
   }
 }
 
 // Stats Provider to aggregate all groups
-final allGroupsExpensesProvider = FutureProvider.family<List<Expense>, List<int>>((ref, groupIds) async {
+final allGroupsExpensesProvider = FutureProvider.family<List<Expense>, String>((
+  ref,
+  groupIdsString,
+) async {
+  // Changed List<int> to String
   final repo = ref.watch(expensesRepositoryProvider);
   final allExpenses = <Expense>[];
-  
+
+  if (groupIdsString.isEmpty) return [];
+
+  final groupIds = groupIdsString.split(',').map(int.parse).toList();
+
   // Parallel fetch could be better but sticking to simple loop for now
   for (var id in groupIds) {
-    final expenses = await repo.getExpensesList(id); // Need to expose getExpensesListFuture
+    final expenses = await repo.getExpensesList(
+      id,
+    ); // Need to expose getExpensesListFuture
     allExpenses.addAll(expenses);
   }
   return allExpenses;

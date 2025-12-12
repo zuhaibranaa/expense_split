@@ -5,6 +5,7 @@ class User {
   final String? avatarUrl;
   final String defaultCurrency;
   final String? phone;
+  final String? iban;
   final bool isVerified;
 
   User({
@@ -14,6 +15,7 @@ class User {
     this.avatarUrl,
     required this.defaultCurrency,
     this.phone,
+    this.iban,
     this.isVerified = false,
   });
 
@@ -25,6 +27,7 @@ class User {
       avatarUrl: json['avatar_url'],
       defaultCurrency: json['default_currency'] ?? 'USD',
       phone: json['phone'],
+      iban: json['iban'],
       isVerified: json['is_verified'] == 1 || json['is_verified'] == true,
     );
   }
@@ -36,6 +39,7 @@ class User {
       'avatar_url': avatarUrl,
       'default_currency': defaultCurrency,
       'phone': phone,
+      'iban': iban,
       'is_verified': isVerified,
     };
   }

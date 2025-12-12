@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 /// Utility class for platform detection that works across all Flutter platforms.
-/// 
+///
 /// This class provides safe platform checks that work on web, mobile, and desktop.
 /// Uses Flutter's foundation library to avoid importing dart:io which breaks web builds.
 class PlatformInfo {
@@ -64,22 +64,22 @@ class PlatformInfo {
   }
 
   /// Returns the appropriate API base URL for the current platform
-  /// 
+  ///
   /// - Web & Desktop: http://localhost:8000
   /// - Android: http://10.0.2.2:8000 (emulator localhost)
   /// - iOS: http://localhost:8000 (simulator can use localhost)
-  /// 
+  ///
   /// Note: For physical devices, you'll need to configure the actual
   /// IP address of your backend server.
   static String getDefaultApiBaseUrl() {
     if (isWeb || isDesktop) {
-      return 'http://localhost:8000';
+      return 'http://127.0.0.1:8000';
     } else if (isAndroid || isIOS) {
       // Use local IP for physical devices and emulators
       // Replace with your machine's local IP
       return 'http://192.168.1.2:8000';
     }
     // Fallback
-    return 'http://localhost:8000';
+    return 'http://127.0.0.1:8000';
   }
 }

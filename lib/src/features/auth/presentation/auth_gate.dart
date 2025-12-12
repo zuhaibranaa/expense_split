@@ -12,18 +12,18 @@ class AuthGate extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Check for invite token in URL (Simulated Deep Link for Web/Simple Mobile)
-    // Note: On mobile, this requires deep link config (Universal Links), 
+    // Note: On mobile, this requires deep link config (Universal Links),
     // but for this clone we assume standard launch or web usage.
     // If we receive "token" query param, we try to claim it.
-    
+
     // We can't easily get query params here without GoRouter state or parsing Uri.base
     // For this simple implementation, we check Uri.base on build.
-    
+
     final uri = Uri.base;
     final inviteToken = uri.queryParameters['token'];
 
     if (inviteToken != null) {
-      // Allow the auth state to settle, then claim. 
+      // Allow the auth state to settle, then claim.
       // Actually, we should only claim if logged in.
     }
 
@@ -37,17 +37,21 @@ class AuthGate extends ConsumerWidget {
               future: _claimInvite(ref, inviteToken, user.id, context),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.done) {
-                   // Clear query params from URL if possible or just show MainScreen
-                   return const MainScreen(); 
+                  // Clear query params from URL if possible or just show MainScreen
+                  return const MainScreen();
                 }
-                return const Scaffold(body: Center(child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Claiming invite...'),
-                  ],
-                )));
+                return const Scaffold(
+                  body: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text('Claiming invite...'),
+                      ],
+                    ),
+                  ),
+                );
               },
             );
           }
@@ -56,26 +60,39 @@ class AuthGate extends ConsumerWidget {
           return const LoginScreen();
         }
       },
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (err, stack) => Scaffold(body: Center(child: Text('Error: $err'))),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (err, stack) => const LoginScreen(),
     );
   }
 
-  Future<void> _claimInvite(WidgetRef ref, String token, int userId, BuildContext context) async {
+  Future<void> _claimInvite(
+    WidgetRef ref,
+    String token,
+    int userId,
+    BuildContext context,
+  ) async {
     try {
       // Avoid double claiming if rebuilt
       // In a real app we'd use a dedicated provider/state for this.
       await ref.read(groupsRepositoryProvider).claimInvite(token, userId);
-      
+
       if (context.mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invite claimed successfully!')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invite claimed successfully!')),
+        );
       }
     } catch (e) {
       if (context.mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to claim invite: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to claim invite: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
     // Modify history/URL if on web? No easy way without Router.
-    // We just return, MainScreen will render. 
+    // We just return, MainScreen will render.
   }
 }

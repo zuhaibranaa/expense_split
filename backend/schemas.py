@@ -6,8 +6,9 @@ class UserBase(BaseModel):
     email: str
     name: str
     avatar_url: Optional[str] = None
-    default_currency: str = "USD"
     phone: Optional[str] = None
+    iban: Optional[str] = None
+    default_currency: Optional[str] = "USD"
 
 class UserLogin(BaseModel):
     email: str
@@ -18,6 +19,7 @@ class UserRegister(BaseModel):
     password: str
     name: str
     currency: str = "USD"
+    iban: Optional[str] = None
 
 class EmailCheckRequest(BaseModel):
     email: str
@@ -64,6 +66,14 @@ class ExpenseCreate(BaseModel):
     date: Optional[datetime] = None
     splits: List[ExpenseSplitCreate]
 
+class ExpenseUpdate(BaseModel):
+    description: Optional[str] = None
+    amount: Optional[float] = None
+    category: Optional[str] = None
+    payer_id: Optional[int] = None
+    date: Optional[datetime] = None
+    splits: Optional[List[ExpenseSplitCreate]] = None
+
 class Expense(BaseModel):
     id: int
     description: str
@@ -74,6 +84,14 @@ class Expense(BaseModel):
     date: datetime
     is_settlement: bool = False
     splits: List[ExpenseSplit] = []
+    class Config:
+        from_attributes = True
+
+class UserLink(BaseModel):
+    id: int
+    name: str
+    avatar_url: Optional[str] = None
+    iban: Optional[str] = None
     class Config:
         from_attributes = True
 
@@ -90,6 +108,7 @@ class Member(MemberBase):
     email: Optional[str] = None
     phone: Optional[str] = None
     user_id: Optional[int] = None
+    user: Optional[UserLink] = None
     is_admin: int = 0
     invite_token: Optional[str] = None
     class Config:

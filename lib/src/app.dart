@@ -1,5 +1,5 @@
-import 'features/groups/presentation/groups_list_screen.dart';import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/material.dart';
+import 'shared/utils/global_keys.dart';
 import 'features/auth/presentation/auth_gate.dart';
 import 'shared/presentation/app_theme.dart';
 
@@ -10,6 +10,7 @@ class SettleUpApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'SettleUp Clone',
+      navigatorKey: navigatorKey,
       theme: AppTheme.darkTheme,
       home: const AuthGate(),
     );

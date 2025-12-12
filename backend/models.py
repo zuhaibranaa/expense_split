@@ -12,6 +12,7 @@ class User(Base):
     avatar_url = Column(String)
     default_currency = Column(String, default="USD")
     phone = Column(String, nullable=True)
+    iban = Column(String, nullable=True)
     is_verified = Column(Integer, default=0) # 0 for false, 1 for true
     verification_token = Column(String, nullable=True)
     password_hash = Column(String)

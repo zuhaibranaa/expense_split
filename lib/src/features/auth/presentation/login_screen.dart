@@ -19,7 +19,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   int _step =
       0; // 0: Email, 1: Password (Login) or Password (Register), 2: Profile (Register)
   bool _isNewUser = false;
-  bool _checkingEmail = false;
+
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -38,7 +39,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
 
-    setState(() => _checkingEmail = true);
+    setState(() => _isLoading = true);
     try {
       final exists = await ref
           .read(authControllerProvider.notifier)
@@ -48,18 +49,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _step = 1;
       });
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error checking email: $e')));
+      // Error handled by global handler, but we stop loading
     } finally {
-      setState(() => _checkingEmail = false);
+      setState(() => _isLoading = false);
     }
   }
 
   Future<void> _handleLogin() async {
-    await ref
-        .read(authControllerProvider.notifier)
-        .login(_emailController.text.trim(), _passwordController.text);
+    setState(() => _isLoading = true);
+    try {
+      await ref
+          .read(authControllerProvider.notifier)
+          .login(_emailController.text.trim(), _passwordController.text);
+    } catch (e) {
+      // Global error handler shows popup
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   void _handleRegisterNext() {
@@ -73,22 +79,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _handleRegister() async {
-    await ref
-        .read(authControllerProvider.notifier)
-        .register(
-          _emailController.text.trim(),
-          _passwordController.text,
-          _nameController.text.trim().isEmpty
-              ? 'User'
-              : _nameController.text.trim(),
-          _currency,
-        );
+    setState(() => _isLoading = true);
+    try {
+      await ref
+          .read(authControllerProvider.notifier)
+          .register(
+            _emailController.text.trim(),
+            _passwordController.text,
+            _nameController.text.trim().isEmpty
+                ? 'User'
+                : _nameController.text.trim(),
+            _currency,
+          );
+    } catch (e) {
+      // Global handler
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authControllerProvider);
-    final isLoading = authState.isLoading || _checkingEmail;
+    // Remove authState usage for loading, rely on local state
+    final isLoading = _isLoading;
 
     // Error Listener
     ref.listen<AsyncValue>(authControllerProvider, (previous, next) {
@@ -146,18 +159,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ? const CircularProgressIndicator(color: Colors.white)
                       : const Text('Continue'),
                 ),
+
                 const SizedBox(height: 16),
-                OutlinedButton(
-                  onPressed: isLoading
-                      ? null
-                      : () async {
-                          // Quick Demo Login logic (bypass email check for demo)
-                          await ref
-                              .read(authControllerProvider.notifier)
-                              .login('demo@example.com', 'demo123');
-                        },
-                  child: const Text('Demo Login (Mock)'),
-                ),
+                // Demo button removed as requested
               ],
 
               if (_step == 1) ...[

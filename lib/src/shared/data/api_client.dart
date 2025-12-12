@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../utils/platform_info.dart';
+import '../utils/global_error_handler.dart';
 
 final apiClientProvider = Provider((ref) => ApiClient());
 
@@ -11,7 +12,7 @@ class ApiClient {
 
   ApiClient() {
     // Automatically detect platform and use appropriate base URL
-    // Web & Desktop: http://localhost:8000
+    // Web & Desktop: http://127.0.0.1:8000
     // Android emulator: http://10.0.2.2:8000
     // iOS simulator: http://localhost:8000
     baseUrl = PlatformInfo.getDefaultApiBaseUrl();
@@ -83,6 +84,11 @@ class ApiClient {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return jsonDecode(responseBody);
     } else {
+      final errorMessage = _getFriendlyErrorMessage(
+        response.statusCode,
+        responseBody,
+      );
+      GlobalErrorHandler.showError(errorMessage);
       throw Exception('API Error: ${response.statusCode} $responseBody');
     }
   }
@@ -91,7 +97,36 @@ class ApiClient {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return jsonDecode(response.body);
     } else {
+      final errorMessage = _getFriendlyErrorMessage(
+        response.statusCode,
+        response.body,
+      );
+      GlobalErrorHandler.showError(errorMessage);
       throw Exception('API Error: ${response.statusCode} ${response.body}');
     }
+  }
+
+  String _getFriendlyErrorMessage(int statusCode, String responseBody) {
+    try {
+      final json = jsonDecode(responseBody);
+      if (json is Map<String, dynamic>) {
+        if (json.containsKey('detail')) {
+          return json['detail'].toString();
+        }
+        if (json.containsKey('message')) {
+          return json['message'].toString();
+        }
+      }
+    } catch (e) {
+      // Not JSON
+    }
+
+    if (statusCode == 401) return 'Invalid credentials. Please try again.';
+    if (statusCode == 403)
+      return 'You do not have permission to perform this action.';
+    if (statusCode == 404) return 'Resource not found.';
+    if (statusCode >= 500) return 'Server error. Please try again later.';
+
+    return 'Something went wrong ($statusCode)';
   }
 }

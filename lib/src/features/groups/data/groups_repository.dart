@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/group_model.dart';
+import '../../people/domain/member_model.dart';
 import '../../../shared/data/api_client.dart';
 import '../../auth/data/auth_repository.dart';
 
@@ -8,7 +9,11 @@ class GroupsRepository {
 
   GroupsRepository(this._api);
 
-  Future<void> createGroup(String name, String currency, int creatorUserId) async {
+  Future<void> createGroup(
+    String name,
+    String currency,
+    int creatorUserId,
+  ) async {
     await _api.post('/groups/', {
       'name': name,
       'currency': currency,
@@ -19,11 +24,18 @@ class GroupsRepository {
   }
 
   Future<List<Group>> getGroups(int? userId) async {
-    final List<dynamic> json = await _api.get('/groups/${userId != null ? "?user_id=$userId" : ""}');
+    final List<dynamic> json = await _api.get(
+      '/groups/${userId != null ? "?user_id=$userId" : ""}',
+    );
     return json.map((e) => Group.fromJson(e)).toList();
   }
 
-  Future<void> updateGroup(int groupId, int userId, {String? name, String? currency}) async {
+  Future<void> updateGroup(
+    int groupId,
+    int userId, {
+    String? name,
+    String? currency,
+  }) async {
     await _api.put('/groups/$groupId?user_id=$userId', {
       if (name != null) 'name': name,
       if (currency != null) 'currency': currency,
@@ -35,13 +47,23 @@ class GroupsRepository {
   }
 
   Future<String> generateInvite(int groupId, int memberId, int userId) async {
-    final response = await _api.post('/groups/$groupId/members/$memberId/invite?user_id=$userId', {});
+    final response = await _api.post(
+      '/groups/$groupId/members/$memberId/invite?user_id=$userId',
+      {},
+    );
     return response['token'];
   }
 
   Future<Map<String, dynamic>> claimInvite(String token, int userId) async {
-    final response = await _api.post('/invites/claim?user_id=$userId', {'token': token});
+    final response = await _api.post('/invites/claim?user_id=$userId', {
+      'token': token,
+    });
     return response;
+  }
+
+  Future<List<Member>> getMembers(int groupId) async {
+    final List<dynamic> json = await _api.get('/groups/$groupId/members/');
+    return json.map((e) => Member.fromJson(e)).toList();
   }
 }
 
@@ -53,7 +75,9 @@ final groupsRepositoryProvider = Provider<GroupsRepository>((ref) {
   return GroupsRepository(api);
 });
 
-final groupsListStreamProvider = StreamProvider.autoDispose<List<Group>>((ref) async* {
+final groupsListStreamProvider = StreamProvider.autoDispose<List<Group>>((
+  ref,
+) async* {
   final repo = ref.watch(groupsRepositoryProvider);
   final user = ref.watch(authControllerProvider).value;
 
@@ -61,13 +85,21 @@ final groupsListStreamProvider = StreamProvider.autoDispose<List<Group>>((ref) a
     yield [];
     return;
   }
-  
+
   // Initial fetch
   yield await repo.getGroups(user.id);
-  
+
   // Simple polling
   await for (final _ in Stream.periodic(const Duration(seconds: 5))) {
     // Check if mounted/active? (StreamProvider handles dispose)
     yield await repo.getGroups(user.id);
   }
+});
+
+final groupMembersProvider = FutureProvider.family<List<Member>, int>((
+  ref,
+  groupId,
+) async {
+  final repo = ref.watch(groupsRepositoryProvider);
+  return repo.getMembers(groupId);
 });

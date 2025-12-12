@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:currency_picker/currency_picker.dart';
 import '../domain/group_model.dart';
@@ -212,6 +213,36 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
               ],
             ],
           ),
+          subtitle: member.iban != null && member.iban!.isNotEmpty
+              ? GestureDetector(
+                  onTap: () async {
+                    await Clipboard.setData(ClipboardData(text: member.iban!));
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('IBAN copied: ${member.iban}')),
+                      );
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 4.0),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          "IBAN: ${member.iban}",
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.blue,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.copy, size: 12, color: Colors.blue),
+                      ],
+                    ),
+                  ),
+                )
+              : null,
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -313,8 +344,9 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
                                 name: nameController.text.trim(),
                               );
 
-                          if (dialogContext.mounted)
+                          if (dialogContext.mounted) {
                             Navigator.pop(dialogContext);
+                          }
                         } catch (e) {
                           setState(() => isLoading = false);
                           if (dialogContext.mounted) {

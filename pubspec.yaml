@@ -52,6 +52,7 @@ dependencies:
   fl_chart: ^1.1.1
   google_sign_in: ^7.2.0
   image_picker: ^1.2.1
+  web_socket_channel: ^3.0.0
 
 dev_dependencies:
   flutter_test:

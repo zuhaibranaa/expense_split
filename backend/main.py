@@ -1,11 +1,12 @@
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, File, UploadFile
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, File, UploadFile, WebSocket, WebSocketDisconnect, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 from pydantic import EmailStr
 import shutil
 import os
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Dict
+import json
 
 import models, schemas
 from database import SessionLocal, engine, get_db
@@ -31,9 +32,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    print(f"Incoming request: {request.method} {request.url} from {request.headers.get('origin')}")
+    response = await call_next(request)
+    print(f"Response status: {response.status_code}")
+    return response
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allow all for dev
+    allow_origins=[],
+    allow_origin_regex=".*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,6 +50,55 @@ app.add_middleware(
 
 # Static Files
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# WebSocket Connection Manager
+class ConnectionManager:
+    def __init__(self):
+        # active_connections: user_id -> List[WebSocket]
+        self.active_connections: Dict[int, List[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket, user_id: int):
+        await websocket.accept()
+        if user_id not in self.active_connections:
+            self.active_connections[user_id] = []
+        self.active_connections[user_id].append(websocket)
+
+    def disconnect(self, websocket: WebSocket, user_id: int):
+        if user_id in self.active_connections:
+            if websocket in self.active_connections[user_id]:
+                self.active_connections[user_id].remove(websocket)
+            if not self.active_connections[user_id]:
+                del self.active_connections[user_id]
+
+    async def send_personal_message(self, message: str, user_id: int):
+        if user_id in self.active_connections:
+            for connection in self.active_connections[user_id]:
+                try:
+                    await connection.send_text(message)
+                except:
+                    pass # Connection might be closed
+
+    async def broadcast_to_group(self, group_id: int, message: dict, members: List[models.Member]):
+        json_message = json.dumps(message)
+        for member in members:
+            if member.user_id and member.user_id in self.active_connections:
+                for connection in self.active_connections[member.user_id]:
+                    try:
+                        await connection.send_text(json_message)
+                    except:
+                        pass
+
+manager = ConnectionManager()
+
+@app.websocket("/ws/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, user_id: int):
+    await manager.connect(websocket, user_id)
+    try:
+        while True:
+            # Keep receiving/discarding just to keep connection alive or handle client-pings
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, user_id)
 
 # Mail Configuration
 conf = ConnectionConfig(
@@ -138,6 +196,7 @@ def update_user_me(user_id: int, user_update: schemas.UserBase, db: Session = De
     db_user.avatar_url = user_update.avatar_url
     db_user.default_currency = user_update.default_currency
     db_user.phone = user_update.phone
+    db_user.iban = user_update.iban
     
     db.commit()
     db.refresh(db_user)
@@ -408,7 +467,7 @@ def claim_invite(invite: InviteClaim, user_id: int, db: Session = Depends(get_db
 
 # Expenses CRUD
 @app.post("/groups/{group_id}/expenses/", response_model=schemas.Expense)
-def create_expense_for_group(group_id: int, expense: schemas.ExpenseCreate, db: Session = Depends(get_db)):
+async def create_expense_for_group(group_id: int, expense: schemas.ExpenseCreate, db: Session = Depends(get_db)):
     # Fetch group to get currency
     db_group = db.query(models.Group).filter(models.Group.id == group_id).first()
     if not db_group:
@@ -440,8 +499,130 @@ def create_expense_for_group(group_id: int, expense: schemas.ExpenseCreate, db: 
     
     db.commit()
     db.refresh(db_expense)
+    
+    # Broadcast to group members via WebSocket
+    try:
+        members = db.query(models.Member).filter(models.Member.group_id == group_id).all()
+        notification = {
+            "type": "expense_created",
+            "group_id": group_id,
+            "description": expense.description,
+            "amount": expense.amount,
+            "currency": db_group.currency,
+            "payer_id": expense.payer_id,
+            "message": f"New expense: {expense.description}"
+        }
+        await manager.broadcast_to_group(group_id, notification, members)
+    except Exception as e:
+        print(f"WS Broadcast error: {e}")
+        
     return db_expense
 
 @app.get("/groups/{group_id}/expenses/", response_model=List[schemas.Expense])
 def read_expenses(group_id: int, db: Session = Depends(get_db)):
     return db.query(models.Expense).filter(models.Expense.group_id == group_id).all()
+
+@app.put("/groups/{group_id}/expenses/{expense_id}", response_model=schemas.Expense)
+async def update_expense(group_id: int, expense_id: int, expense_update: schemas.ExpenseUpdate, user_id: int, db: Session = Depends(get_db)):
+    # 1. Fetch Expense
+    db_expense = db.query(models.Expense).filter(models.Expense.id == expense_id, models.Expense.group_id == group_id).first()
+    if not db_expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    # 2. Check Permission: Only Creator/Payer or Admin can edit (Simplification: Payer can edit)
+    # We ideally need to know who created it, but Payer is a good proxy.
+    # Also check if user is admin of group
+    is_admin = db.query(models.Member).filter(
+        models.Member.group_id == group_id,
+        models.Member.user_id == user_id,
+        models.Member.is_admin == 1
+    ).first() is not None
+    
+    # Check if payer is linked to this user
+    payer_member = db.query(models.Member).filter(models.Member.id == db_expense.payer_id).first()
+    is_payer = payer_member and payer_member.user_id == user_id
+    
+    if not (is_admin or is_payer):
+        raise HTTPException(status_code=403, detail="Permission denied")
+
+    # 3. Update Fields
+    if expense_update.description is not None:
+        db_expense.description = expense_update.description
+    if expense_update.amount is not None:
+        db_expense.amount = expense_update.amount
+    if expense_update.category is not None:
+        db_expense.category = expense_update.category
+    if expense_update.payer_id is not None:
+        db_expense.payer_id = expense_update.payer_id
+    if expense_update.date is not None:
+        db_expense.date = expense_update.date
+
+    # 4. Update Splits (Replace Strategy)
+    if expense_update.splits is not None:
+        # Delete old splits
+        db.query(models.ExpenseSplit).filter(models.ExpenseSplit.expense_id == expense_id).delete()
+        # Add new splits
+        for split in expense_update.splits:
+            db_split = models.ExpenseSplit(
+                expense_id=db_expense.id,
+                member_id=split.member_id,
+                amount=split.amount
+            )
+            db.add(db_split)
+
+    db.commit()
+    db.refresh(db_expense)
+    
+    # Notify
+    try:
+        members = db.query(models.Member).filter(models.Member.group_id == group_id).all()
+        notification = {
+            "type": "expense_updated",
+            "group_id": group_id,
+            "message": f"Expense updated: {db_expense.description}"
+        }
+        await manager.broadcast_to_group(group_id, notification, members)
+    except Exception:
+        pass
+
+    return db_expense
+
+@app.delete("/groups/{group_id}/expenses/{expense_id}")
+async def delete_expense(group_id: int, expense_id: int, user_id: int, db: Session = Depends(get_db)):
+    db_expense = db.query(models.Expense).filter(models.Expense.id == expense_id, models.Expense.group_id == group_id).first()
+    if not db_expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    # Check Permission
+    is_admin = db.query(models.Member).filter(
+        models.Member.group_id == group_id,
+        models.Member.user_id == user_id,
+        models.Member.is_admin == 1
+    ).first() is not None
+    
+    payer_member = db.query(models.Member).filter(models.Member.id == db_expense.payer_id).first()
+    is_payer = payer_member and payer_member.user_id == user_id
+
+    if not (is_admin or is_payer):
+         raise HTTPException(status_code=403, detail="Permission denied")
+
+    db.delete(db_expense) # Splits should cascade delete ideally, or we delete manually
+    # SQLAlchemy default cascade might not be set, let's delete splits manually to be safe or assume cascade 
+    # (Assuming models.py doesn't have cascade set, explicit delete is safer)
+    db.query(models.ExpenseSplit).filter(models.ExpenseSplit.expense_id == expense_id).delete()
+    
+    db.commit()
+    
+    # Notify
+    try:
+        members = db.query(models.Member).filter(models.Member.group_id == group_id).all()
+        notification = {
+            "type": "expense_deleted",
+            "group_id": group_id,
+            "message": "Expense deleted"
+        }
+        await manager.broadcast_to_group(group_id, notification, members)
+    except Exception:
+        pass
+
+    return {"message": "Expense deleted"}

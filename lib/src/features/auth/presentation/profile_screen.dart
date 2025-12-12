@@ -105,6 +105,22 @@ class ProfileScreen extends ConsumerWidget {
                 ),
               ),
 
+              ListTile(
+                leading: const Icon(Icons.account_balance),
+                title: const Text("IBAN"),
+                subtitle: Text(user.iban ?? "Not set"),
+                trailing: const Icon(Icons.edit, size: 16),
+                onTap: () => _editField(
+                  context,
+                  ref,
+                  "IBAN",
+                  user.iban,
+                  (val) => ref
+                      .read(authControllerProvider.notifier)
+                      .updateProfile(iban: val),
+                ),
+              ),
+
               const SizedBox(height: 24),
               _buildSectionHeader("Settings"),
 

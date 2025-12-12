@@ -4,6 +4,8 @@ import '../../groups/presentation/groups_list_screen.dart';
 import '../../auth/presentation/profile_screen.dart';
 import '../../analytics/presentation/stats_screen.dart';
 import '../../analytics/presentation/global_settlements_screen.dart';
+import '../../auth/data/auth_repository.dart';
+import '../../../core/network/websocket_service.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});
@@ -17,18 +19,27 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
   final List<Widget> _screens = [
     const GroupsListScreen(), // Home
-    const StatsScreen(),      // Stats
+    const StatsScreen(), // Stats
     const GlobalSettlementsScreen(), // Settlements
-    const ProfileScreen(),    // Profile
+    const ProfileScreen(), // Profile
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Connect to WebSocket after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = ref.read(authControllerProvider).value;
+      if (user != null) {
+        ref.read(webSocketServiceProvider).connect(user.id);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {

@@ -3,14 +3,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/expenses_repository.dart';
 import '../../people/data/members_repository.dart';
 import '../../people/domain/member_model.dart';
+import '../../auth/data/auth_repository.dart';
+import '../domain/expense_model.dart';
 
 enum SplitMethod { equal, exact }
 
 class AddExpenseScreen extends ConsumerStatefulWidget {
   final int groupId;
-  final String groupCurrency;  // Add group currency
+  final String groupCurrency; // Add group currency
 
-  const AddExpenseScreen({super.key, required this.groupId, required this.groupCurrency});
+  final Expense? expense;
+
+  const AddExpenseScreen({
+    super.key,
+    required this.groupId,
+    required this.groupCurrency,
+    this.expense,
+  });
 
   @override
   ConsumerState<AddExpenseScreen> createState() => _AddExpenseScreenState();
@@ -21,9 +30,28 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   final _amountController = TextEditingController();
   int? _selectedPayerId;
   String _selectedCategory = 'General';
-  
+
   SplitMethod _splitMethod = SplitMethod.equal;
   final Map<int, TextEditingController> _splitControllers = {};
+  bool _isInit = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_isInit && widget.expense != null) {
+      _descriptionController.text = widget.expense!.description;
+      _amountController.text = widget.expense!.amount.toString();
+      _selectedPayerId = widget.expense!.payerId;
+      _selectedCategory = widget.expense!.category;
+
+      // Handle splits
+      // Start by initializing for all (will require members, so we do it in build/submit or logic below)
+      // Actually, we can't initialize controllers here because we don't have members yet.
+      // We'll rely on the FutureBuilder in build to initialize defaults, but we need to flag that we are editing.
+      // To pre-fill custom splits, we'll need to match members.
+    }
+    _isInit = false;
+  }
 
   @override
   void dispose() {
@@ -40,22 +68,49 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     final membersAsync = ref.watch(membersStreamProvider(widget.groupId));
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('New Expense'),
-      ),
+      appBar: AppBar(title: const Text('New Expense')),
       body: membersAsync.when(
         data: (members) {
           if (members.isEmpty) {
             return const Center(child: Text('Add people to the group first!'));
           }
-          
-          // Default payer initialization
-          if (_selectedPayerId == null && members.isNotEmpty) {
-             _selectedPayerId = members.first.id;
-             // Initialize controllers for exact split
-             for (var m in members) {
-               _splitControllers[m.id] = TextEditingController(text: '0.00');
-             }
+
+          // Default payer initialization or Edit Mode pre-fill
+          if (_selectedPayerId == null) {
+            if (widget.expense != null) {
+              // Pre-fill from expense
+              _selectedPayerId = widget.expense!.payerId;
+              // Check if splits are equal or exact
+              // Simple heuristic: if all splits are equal amount (approx) -> Equal, else Exact
+              bool isEqual = true;
+              if (widget.expense!.splits.isNotEmpty) {
+                final firstAmount = widget.expense!.splits.first.amount;
+                for (var s in widget.expense!.splits) {
+                  if ((s.amount - firstAmount).abs() > 0.01) {
+                    isEqual = false;
+                    break;
+                  }
+                }
+              }
+              _splitMethod = isEqual ? SplitMethod.equal : SplitMethod.exact;
+
+              // Init controllers
+              for (var m in members) {
+                final split = widget.expense!.splits.firstWhere(
+                  (s) => s.memberId == m.id,
+                  orElse: () => ExpenseSplit(id: -1, memberId: m.id, amount: 0),
+                );
+                _splitControllers[m.id] = TextEditingController(
+                  text: split.amount.toStringAsFixed(2),
+                );
+              }
+            } else if (members.isNotEmpty) {
+              _selectedPayerId = members.first.id;
+              // Initialize controllers for exact split
+              for (var m in members) {
+                _splitControllers[m.id] = TextEditingController(text: '0.00');
+              }
+            }
           }
 
           return SingleChildScrollView(
@@ -73,7 +128,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                   textCapitalization: TextCapitalization.sentences,
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Amount
                 TextField(
                   controller: _amountController,
@@ -82,11 +137,13 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     prefixIcon: const Icon(Icons.attach_money),
                     helperText: 'Currency: ${widget.groupCurrency}',
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  onChanged: (val) => setState(() {}), 
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  onChanged: (val) => setState(() {}),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Payer
                 DropdownButtonFormField<int>(
                   value: _selectedPayerId,
@@ -95,10 +152,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     prefixIcon: Icon(Icons.person),
                   ),
                   items: members.map((m) {
-                    return DropdownMenuItem(
-                      value: m.id,
-                      child: Text(m.name),
-                    );
+                    return DropdownMenuItem(value: m.id, child: Text(m.name));
                   }).toList(),
                   onChanged: (val) {
                     setState(() => _selectedPayerId = val);
@@ -113,23 +167,34 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     labelText: 'Category',
                     prefixIcon: Icon(Icons.category),
                   ),
-                  items: ['General', 'Food & Drinks', 'Housing', 'Transport', 'Utilities', 'Entertainment'].map((c) {
-                    return DropdownMenuItem(
-                      value: c,
-                      child: Text(c),
-                    );
-                  }).toList(),
+                  items:
+                      [
+                        'General',
+                        'Food & Drinks',
+                        'Housing',
+                        'Transport',
+                        'Utilities',
+                        'Entertainment',
+                      ].map((c) {
+                        return DropdownMenuItem(value: c, child: Text(c));
+                      }).toList(),
                   onChanged: (val) {
                     setState(() => _selectedCategory = val ?? 'General');
                   },
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Split Method Toggle
                 SegmentedButton<SplitMethod>(
                   segments: const [
-                    ButtonSegment(value: SplitMethod.equal, label: Text('Equal')),
-                    ButtonSegment(value: SplitMethod.exact, label: Text('Exact Amount')),
+                    ButtonSegment(
+                      value: SplitMethod.equal,
+                      label: Text('Equal'),
+                    ),
+                    ButtonSegment(
+                      value: SplitMethod.exact,
+                      label: Text('Exact Amount'),
+                    ),
                   ],
                   selected: {_splitMethod},
                   onSelectionChanged: (newSelection) {
@@ -141,18 +206,23 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 const SizedBox(height: 16),
 
                 // Split Details
-                Text('Split Details', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  'Split Details',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 const SizedBox(height: 8),
-                if (_splitMethod == SplitMethod.equal) 
+                if (_splitMethod == SplitMethod.equal)
                   _buildEqualSplitView(members)
-                else 
+                else
                   _buildExactSplitView(members),
 
                 const SizedBox(height: 32),
                 FilledButton.icon(
                   onPressed: () => _submit(members),
                   icon: const Icon(Icons.check),
-                  label: const Text('Save Expense'),
+                  label: Text(
+                    widget.expense == null ? 'Save Expense' : 'Update Expense',
+                  ),
                 ),
               ],
             ),
@@ -167,7 +237,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   Widget _buildEqualSplitView(List<Member> members) {
     final totalAmount = double.tryParse(_amountController.text) ?? 0.0;
     final perPerson = members.isNotEmpty ? totalAmount / members.length : 0.0;
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -176,7 +246,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             Text('Split equally between ${members.length} people'),
             const SizedBox(height: 4),
             Text(
-              '${widget.groupCurrency} ${perPerson.toStringAsFixed(2)} / person', 
+              '${widget.groupCurrency} ${perPerson.toStringAsFixed(2)} / person',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ],
@@ -203,7 +273,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     contentPadding: const EdgeInsets.all(8),
                     border: const OutlineInputBorder(),
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                 ),
               ),
             ],
@@ -216,10 +288,15 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   void _submit(List<Member> members) async {
     final desc = _descriptionController.text.trim();
     final totalAmount = double.tryParse(_amountController.text);
-    
-    if (desc.isEmpty || totalAmount == null || totalAmount <= 0 || _selectedPayerId == null) {
+
+    if (desc.isEmpty ||
+        totalAmount == null ||
+        totalAmount <= 0 ||
+        _selectedPayerId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in valid description and amount')),
+        const SnackBar(
+          content: Text('Please fill in valid description and amount'),
+        ),
       );
       return;
     }
@@ -227,15 +304,16 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     // Calculate Splits
     final Map<int, double> splits = {};
     if (_splitMethod == SplitMethod.equal) {
-       final splitAmount = totalAmount / members.length;
-       for (var m in members) {
-         splits[m.id] = splitAmount;
-       }
+      final splitAmount = totalAmount / members.length;
+      for (var m in members) {
+        splits[m.id] = splitAmount;
+      }
     } else {
       // Exact split logic
       double sumCheck = 0.0;
       for (var m in members) {
-        final val = double.tryParse(_splitControllers[m.id]?.text ?? '0') ?? 0.0;
+        final val =
+            double.tryParse(_splitControllers[m.id]?.text ?? '0') ?? 0.0;
         splits[m.id] = val;
         sumCheck += val;
       }
@@ -243,7 +321,11 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       // Allow a small epsilon for floating point math, but warn if totally off
       if ((sumCheck - totalAmount).abs() > 0.05) {
         ScaffoldMessenger.of(context).showSnackBar(
-           SnackBar(content: Text('Splits sum (${widget.groupCurrency} $sumCheck) must equal Total (${widget.groupCurrency} $totalAmount)')),
+          SnackBar(
+            content: Text(
+              'Splits sum (${widget.groupCurrency} $sumCheck) must equal Total (${widget.groupCurrency} $totalAmount)',
+            ),
+          ),
         );
         return;
       }
@@ -251,19 +333,44 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
     final navigator = Navigator.of(context);
     try {
-      await ref.read(expensesRepositoryProvider).createExpense(
-        groupId: widget.groupId,
-        description: desc,
-        amount: totalAmount,
-        payerId: _selectedPayerId!,
-        category: _selectedCategory,
-        date: DateTime.now(),
-        splits: splits,
-      );
+      if (widget.expense == null) {
+        await ref
+            .read(expensesRepositoryProvider)
+            .createExpense(
+              groupId: widget.groupId,
+              description: desc,
+              amount: totalAmount,
+              payerId: _selectedPayerId!,
+              category: _selectedCategory,
+              date: DateTime.now(),
+              splits: splits,
+            );
+      } else {
+        final user = ref.read(authControllerProvider).value;
+        if (user != null) {
+          await ref
+              .read(expensesRepositoryProvider)
+              .updateExpense(
+                groupId: widget.groupId,
+                expenseId: widget.expense!.id,
+                userId: user.id,
+                description: desc,
+                amount: totalAmount,
+                payerId: _selectedPayerId!,
+                category: _selectedCategory,
+                date: widget
+                    .expense!
+                    .date, // Keep original date or update? user didn't ask to change date.
+                splits: splits,
+              );
+        }
+      }
       if (navigator.mounted) navigator.pop();
     } catch (e) {
       if (mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }

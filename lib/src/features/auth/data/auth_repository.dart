@@ -85,6 +85,7 @@ class AuthRepository {
     String? avatarUrl,
     String? currency,
     String? phone,
+    String? iban,
   }) async {
     if (_currentUser == null) return;
 
@@ -94,6 +95,7 @@ class AuthRepository {
       'avatar_url': avatarUrl ?? _currentUser!.avatarUrl,
       'default_currency': currency ?? _currentUser!.defaultCurrency,
       'phone': phone ?? _currentUser!.phone,
+      'iban': iban ?? _currentUser!.iban,
     });
 
     _currentUser = User.fromJson(response);
@@ -158,11 +160,9 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
 
   Future<void> login(String email, String password) async {
     final repo = ref.read(authRepositoryProvider);
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      await repo.login(email, password);
-      return repo.currentUser;
-    });
+    // Do not set global loading state here to prevent UI reset
+    await repo.login(email, password);
+    state = AsyncValue.data(repo.currentUser);
   }
 
   Future<void> register(
@@ -172,11 +172,9 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
     String currency,
   ) async {
     final repo = ref.read(authRepositoryProvider);
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      await repo.register(email, password, name, currency);
-      return repo.currentUser;
-    });
+    // Do not set global loading state here to prevent UI reset
+    await repo.register(email, password, name, currency);
+    state = AsyncValue.data(repo.currentUser);
   }
 
   Future<bool> checkEmail(String email) async {
@@ -189,6 +187,7 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
     String? avatarUrl,
     String? currency,
     String? phone,
+    String? iban,
   }) async {
     final repo = ref.read(authRepositoryProvider);
     state = const AsyncValue.loading();
@@ -198,6 +197,7 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
         avatarUrl: avatarUrl,
         currency: currency,
         phone: phone,
+        iban: iban,
       );
       return repo.currentUser;
     });
