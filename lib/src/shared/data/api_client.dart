@@ -16,6 +16,8 @@ class ApiClient {
     // Android emulator: http://10.0.2.2:8000
     // iOS simulator: http://localhost:8000
     baseUrl = PlatformInfo.getDefaultApiBaseUrl();
+    print('ApiClient: Initialized for ${PlatformInfo.platformName}');
+    print('ApiClient: Using Base URL: $baseUrl');
 
     if (kDebugMode) {
       print(
@@ -30,12 +32,19 @@ class ApiClient {
   }
 
   Future<dynamic> post(String endpoint, Map<String, dynamic> body) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
-    );
-    return _handleResponse(response);
+    try {
+      print('ApiClient: POST $endpoint payload: $body');
+      final response = await http.post(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+      print('ApiClient: POST $endpoint response: ${response.statusCode}');
+      return _handleResponse(response);
+    } catch (e) {
+      print('ApiClient: POST $endpoint failed: $e');
+      rethrow;
+    }
   }
 
   Future<dynamic> put(String endpoint, Map<String, dynamic> body) async {

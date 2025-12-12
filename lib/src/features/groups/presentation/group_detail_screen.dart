@@ -14,25 +14,36 @@ class GroupDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DefaultTabController(
-      length: 4,  // Changed from 3 to 4
+      length: 4, // Changed from 3 to 4
       child: Scaffold(
         appBar: AppBar(
           title: Text(group.name),
-          bottom: const TabBar(
-            tabs: [
+          bottom: TabBar(
+            indicator: const UnderlineTabIndicator(
+              borderSide: BorderSide(width: 3.0, color: Color(0xFF00E5FF)),
+              insets: EdgeInsets.symmetric(horizontal: 16.0),
+            ),
+            indicatorSize: TabBarIndicatorSize.tab,
+            labelColor: const Color(0xFF00E5FF),
+            unselectedLabelColor: Colors.grey,
+            labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+            tabs: const [
               Tab(text: 'Expenses'),
               Tab(text: 'Balances'),
               Tab(text: 'People'),
-              Tab(text: 'Settings'),  // New tab
+              Tab(text: 'Settings'),
             ],
           ),
         ),
         body: TabBarView(
           children: [
-            ExpensesListScreen(groupId: group.id, groupCurrency: group.currency),
+            ExpensesListScreen(
+              groupId: group.id,
+              groupCurrency: group.currency,
+            ),
             BalancesScreen(groupId: group.id, groupCurrency: group.currency),
             MembersListView(groupId: group.id),
-            GroupSettingsScreen(group: group),  // New settings screen
+            GroupSettingsScreen(group: group), // New settings screen
           ],
         ),
       ),
