@@ -95,7 +95,12 @@ class ApiClient {
 
   dynamic _handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      return jsonDecode(response.body);
+      final body = jsonDecode(response.body);
+      // Check for standard success response format
+      if (body is Map<String, dynamic> && body['status'] == 'success') {
+        return body['data'];
+      }
+      return body;
     } else {
       final errorMessage = _getFriendlyErrorMessage(
         response.statusCode,
@@ -110,6 +115,15 @@ class ApiClient {
     try {
       final json = jsonDecode(responseBody);
       if (json is Map<String, dynamic>) {
+        // Standard ApiError format
+        if (json['status'] == 'error' && json.containsKey('message')) {
+          // If validation errors exist, maybe append them?
+          if (json['errors'] != null) {
+            return "${json['message']} (${json['errors']})";
+          }
+          return json['message'].toString();
+        }
+        // Legacy formats
         if (json.containsKey('detail')) {
           return json['detail'].toString();
         }

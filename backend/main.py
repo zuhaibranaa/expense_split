@@ -1,36 +1,20 @@
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, File, UploadFile, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from app.schemas.response import ApiError
 from fastapi.staticfiles import StaticFiles
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
-from pydantic import EmailStr
-import shutil
-import os
-from sqlalchemy.orm import Session
-from typing import List, Dict
-import json
-
-import models, schemas
-from database import SessionLocal, engine, get_db
-import secrets
-import bcrypt
-
-# Password hashing config (using pure bcrypt to avoid passlib+bcrypt 5.0 issues)
-
-def verify_password(plain_password, hashed_password):
-    # bcrypt requires bytes
-    if isinstance(hashed_password, str):
-        hashed_password = hashed_password.encode('utf-8')
-    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password)
-
-def get_password_hash(password):
-    salt = bcrypt.gensalt()
-    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
-
-# Create Tables
-models.Base.metadata.create_all(bind=engine)
-
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI()
+from app.core.database import engine, Base, SessionLocal
+from app.api.api_v1 import api_router
+from app.websockets.manager import manager
+from app.models import user as user_model # Import models to ensure they are registered
+from app.core.security import get_password_hash
+
+app = FastAPI(title="SettleUp Clone Backend")
+
+# Create Tables
+Base.metadata.create_all(bind=engine)
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -39,10 +23,45 @@ async def log_requests(request: Request, call_next):
     print(f"Response status: {response.status_code}")
     return response
 
+# Exception Handlers
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=ApiError(
+            status="error",
+            code=exc.status_code,
+            message=exc.detail
+        ).dict()
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content=ApiError(
+            status="error",
+            code=422,
+            message="Validation error",
+            errors=exc.errors()
+        ).dict()
+    )
+
+# Optional: Catch-all handler (use with caution, maybe only for prod)
+# @app.exception_handler(Exception)
+# async def general_exception_handler(request: Request, exc: Exception):
+#     return JSONResponse(
+#         status_code=500,
+#         content=ApiError(
+#             status="error",
+#             code=500,
+#             message="Internal Server Error"
+#         ).dict()
+#     )
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[],
-    allow_origin_regex=".*",
+    allow_origins=["*"], # TODO: Restrict in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -51,72 +70,20 @@ app.add_middleware(
 # Static Files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# WebSocket Connection Manager
-class ConnectionManager:
-    def __init__(self):
-        # active_connections: user_id -> List[WebSocket]
-        self.active_connections: Dict[int, List[WebSocket]] = {}
+@app.get("/")
+def read_root():
+    return {"message": "SettleUp Backend Running (FastAPI + SQLAlchemy) - Modular"}
 
-    async def connect(self, websocket: WebSocket, user_id: int):
-        await websocket.accept()
-        if user_id not in self.active_connections:
-            self.active_connections[user_id] = []
-        self.active_connections[user_id].append(websocket)
-
-    def disconnect(self, websocket: WebSocket, user_id: int):
-        if user_id in self.active_connections:
-            if websocket in self.active_connections[user_id]:
-                self.active_connections[user_id].remove(websocket)
-            if not self.active_connections[user_id]:
-                del self.active_connections[user_id]
-
-    async def send_personal_message(self, message: str, user_id: int):
-        if user_id in self.active_connections:
-            for connection in self.active_connections[user_id]:
-                try:
-                    await connection.send_text(message)
-                except:
-                    pass # Connection might be closed
-
-    async def broadcast_to_group(self, group_id: int, message: dict, members: List[models.Member]):
-        json_message = json.dumps(message)
-        for member in members:
-            if member.user_id and member.user_id in self.active_connections:
-                for connection in self.active_connections[member.user_id]:
-                    try:
-                        await connection.send_text(json_message)
-                    except:
-                        pass
-
-manager = ConnectionManager()
+app.include_router(api_router)
 
 @app.websocket("/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: int):
     await manager.connect(websocket, user_id)
     try:
         while True:
-            # Keep receiving/discarding just to keep connection alive or handle client-pings
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket, user_id)
-
-# Mail Configuration
-conf = ConnectionConfig(
-    MAIL_USERNAME="",
-    MAIL_PASSWORD="",
-    MAIL_FROM="noreply@settleup.com",
-    MAIL_PORT=1025,
-    MAIL_SERVER="localhost",
-    MAIL_STARTTLS=False,
-    MAIL_SSL_TLS=False,
-    USE_CREDENTIALS=False,
-    VALIDATE_CERTS=False
-)
-
-
-@app.get("/")
-def read_root():
-    return {"message": "SettleUp Backend Running (FastAPI + SQLAlchemy)"}
 
 @app.on_event("startup")
 async def startup_event():
@@ -124,10 +91,10 @@ async def startup_event():
     db = SessionLocal()
     try:
         demo_email = "demo@example.com"
-        existing = db.query(models.User).filter(models.User.email == demo_email).first()
+        existing = db.query(user_model.User).filter(user_model.User.email == demo_email).first()
         if not existing:
             hashed_pwd = get_password_hash("demo123")
-            demo_user = models.User(
+            demo_user = user_model.User(
                 email=demo_email,
                 name="Demo User",
                 password_hash=hashed_pwd,
@@ -142,487 +109,3 @@ async def startup_event():
         print(f"Error seeding demo user: {e}")
     finally:
         db.close()
-
-# Auth
-@app.post("/auth/check-email", response_model=schemas.EmailCheckResponse)
-def check_email(check: schemas.EmailCheckRequest, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == check.email).first()
-    return {"email": check.email, "exists": user is not None}
-
-@app.post("/auth/register", response_model=schemas.User)
-def register(user: schemas.UserRegister, db: Session = Depends(get_db)):
-    db_user = db.query(models.User).filter(models.User.email == user.email).first()
-    if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    hashed_password = get_password_hash(user.password)
-    db_user = models.User(
-        email=user.email,
-        name=user.name,
-        password_hash=hashed_password,
-        default_currency=user.currency,
-        avatar_url=f"https://ui-avatars.com/api/?name={user.name}&background=random"
-    )
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
-
-@app.post("/auth/login", response_model=schemas.User)
-def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
-    db_user = db.query(models.User).filter(models.User.email == user.email).first()
-    if not db_user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    if not verify_password(user.password, db_user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-        
-    return db_user
-
-@app.get("/me/{user_id}", response_model=schemas.User)
-def read_user_me(user_id: int, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user:
-         raise HTTPException(status_code=404, detail="User not found")
-    return user
-
-@app.put("/me/{user_id}", response_model=schemas.User)
-def update_user_me(user_id: int, user_update: schemas.UserBase, db: Session = Depends(get_db)):
-    db_user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not db_user:
-         raise HTTPException(status_code=404, detail="User not found")
-    
-    db_user.name = user_update.name
-    db_user.avatar_url = user_update.avatar_url
-    db_user.default_currency = user_update.default_currency
-    db_user.phone = user_update.phone
-    db_user.iban = user_update.iban
-    
-    db.commit()
-    db.refresh(db_user)
-    return db_user
-
-@app.post("/auth/verify-request")
-async def request_verification(email: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    if user.is_verified:
-        return {"message": "Already verified"}
-
-    token = secrets.token_urlsafe(32)
-    user.verification_token = token
-    db.commit()
-
-    message = MessageSchema(
-        subject="Verify your SettleUp Email",
-        recipients=[email],
-        body=f"Click here to verify: http://localhost:8000/auth/verify?token={token}",
-        subtype=MessageType.html
-    )
-
-    print(f"--- EMAIL VERIFICATION ---\nTo verify: http://localhost:8000/auth/verify?token={token}\n--------------------------")
-
-    fm = FastMail(conf)
-    try:
-        background_tasks.add_task(fm.send_message, message)
-    except Exception as e:
-        print(f"Failed to send email (Mailpit might be down): {e}")
-
-    return {"message": "Verification email sent (check console if Mailpit unavailable)"}
-
-@app.get("/auth/verify")
-def verify_email(token: str, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.verification_token == token).first()
-    if not user:
-        raise HTTPException(status_code=400, detail="Invalid token")
-    
-    user.is_verified = 1
-    user.verification_token = None
-    db.commit()
-    
-    return {"message": "Email verified successfully"}
-
-@app.post("/upload/image")
-async def upload_image(file: UploadFile = File(...)):
-    # Create directory if not exists (safety check)
-    os.makedirs("static/images", exist_ok=True)
-    
-    # Generate unique filename to avoid collisions
-    file_ext = os.path.splitext(file.filename)[1]
-    filename = f"{secrets.token_hex(8)}{file_ext}"
-    file_location = f"static/images/{filename}"
-    
-    with open(file_location, "wb+") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-        
-    # Return full URL assuming local dev
-    return {"url": f"http://localhost:8000/{file_location}"}
-
-# Groups CRUD
-@app.post("/groups/", response_model=schemas.Group)
-def create_group(group: schemas.GroupCreate, db: Session = Depends(get_db)):
-    # Create the group
-    db_group = models.Group(
-        name=group.name, 
-        currency=group.currency,
-        created_by=group.creator_user_id
-    )
-    db.add(db_group)
-    db.commit()
-    db.refresh(db_group)
-    
-    # Get the creator user to add as admin member
-    creator = db.query(models.User).filter(models.User.id == group.creator_user_id).first()
-    if creator:
-        # Automatically add creator as admin member
-        admin_member = models.Member(
-            name=creator.name,
-            email=creator.email,
-            user_id=creator.id,
-            group_id=db_group.id,
-            is_admin=1  # Creator is admin
-        )
-        db.add(admin_member)
-        db.commit()
-        db.refresh(db_group)  # Refresh to get the members relationship
-    
-    return db_group
-
-@app.get("/groups/", response_model=List[schemas.Group])
-def read_groups(skip: int = 0, limit: int = 100, user_id: int = None, db: Session = Depends(get_db)):
-    query = db.query(models.Group)
-    if user_id:
-        query = query.join(models.Member).filter(models.Member.user_id == user_id)
-    
-    groups = query.offset(skip).limit(limit).all()
-    return groups
-
-@app.get("/groups/{group_id}", response_model=schemas.Group)
-def read_group(group_id: int, db: Session = Depends(get_db)):
-    group = db.query(models.Group).filter(models.Group.id == group_id).first()
-    if group is None:
-        raise HTTPException(status_code=404, detail="Group not found")
-    return group
-
-# Permission Helper
-def check_admin_permission(group_id: int, user_id: int, db: Session):
-    """Check if user is admin of the group"""
-    member = db.query(models.Member).filter(
-        models.Member.group_id == group_id,
-        models.Member.user_id == user_id,
-        models.Member.is_admin == 1
-    ).first()
-    if not member:
-        raise HTTPException(status_code=403, detail="Admin permission required")
-    return member
-
-@app.put("/groups/{group_id}", response_model=schemas.Group)
-def update_group(group_id: int, group_update: schemas.GroupUpdate, user_id: int, db: Session = Depends(get_db)):
-    """Update group (admin only) - currently supports currency change"""
-    # Check admin permission
-    check_admin_permission(group_id, user_id, db)
-    
-    # Get and update group
-    db_group = db.query(models.Group).filter(models.Group.id == group_id).first()
-    if not db_group:
-        raise HTTPException(status_code=404, detail="Group not found")
-    
-    if group_update.currency:
-        db_group.currency = group_update.currency
-    if group_update.name:
-        db_group.name = group_update.name
-    
-    db.commit()
-    db.refresh(db_group)
-    return db_group
-
-@app.delete("/groups/{group_id}")
-def delete_group(group_id: int, user_id: int, db: Session = Depends(get_db)):
-    """Delete group (admin only)"""
-    # Check admin permission
-    check_admin_permission(group_id, user_id, db)
-    
-    # Delete group (cascade will handle members, expenses, etc.)
-    db_group = db.query(models.Group).filter(models.Group.id == group_id).first()
-    if not db_group:
-        raise HTTPException(status_code=404, detail="Group not found")
-    
-    db.delete(db_group)
-    db.commit()
-    return {"message": "Group deleted successfully"}
-
-
-# Members CRUD
-@app.post("/groups/{group_id}/members/", response_model=schemas.Member)
-def create_member_for_group(group_id: int, member: schemas.MemberCreate, db: Session = Depends(get_db)):
-    db_member = models.Member(**member.dict(), group_id=group_id)
-    db.add(db_member)
-    db.commit()
-    db.refresh(db_member)
-    return db_member
-
-@app.get("/groups/{group_id}/members/", response_model=List[schemas.Member])
-def read_members(group_id: int, db: Session = Depends(get_db)):
-    return db.query(models.Member).filter(models.Member.group_id == group_id).all()
-
-@app.put("/groups/{group_id}/members/{member_id}", response_model=schemas.Member)
-def update_member(group_id: int, member_id: int, member_update: schemas.MemberUpdate, user_id: int, db: Session = Depends(get_db)):
-    """Update member (admin can edit any, user can edit self only)"""
-    db_member = db.query(models.Member).filter(
-        models.Member.id == member_id,
-        models.Member.group_id == group_id
-    ).first()
-    
-    if not db_member:
-        raise HTTPException(status_code=404, detail="Member not found")
-    
-    # Check permission: admin can edit any, user can only edit self
-    is_admin = db.query(models.Member).filter(
-        models.Member.group_id == group_id,
-        models.Member.user_id == user_id,
-        models.Member.is_admin == 1
-    ).first() is not None
-    
-    is_self = db_member.user_id == user_id
-    
-    if not (is_admin or is_self):
-        raise HTTPException(status_code=403, detail="Permission denied")
-    
-    # Update member
-    if member_update.name:
-        db_member.name = member_update.name
-    
-    db.commit()
-    db.refresh(db_member)
-    return db_member
-
-@app.delete("/groups/{group_id}/members/{member_id}")
-def delete_member(group_id: int, member_id: int, user_id: int, db: Session = Depends(get_db)):
-    """Remove member from group (admin only)"""
-    # Check admin permission
-    check_admin_permission(group_id, user_id, db)
-    
-    db_member = db.query(models.Member).filter(
-        models.Member.id == member_id,
-        models.Member.group_id == group_id
-    ).first()
-    
-    if not db_member:
-        raise HTTPException(status_code=404, detail="Member not found")
-    
-    db.delete(db_member)
-    db.commit()
-    return {"message": "Member removed successfully"}
-
-@app.post("/groups/{group_id}/members/{member_id}/invite")
-def generate_invite(group_id: int, member_id: int, user_id: int, db: Session = Depends(get_db)):
-    """Generate invite link for a member (admin only)"""
-    # Check admin permission
-    check_admin_permission(group_id, user_id, db)
-    
-    db_member = db.query(models.Member).filter(
-        models.Member.id == member_id,
-        models.Member.group_id == group_id
-    ).first()
-    
-    if not db_member:
-        raise HTTPException(status_code=404, detail="Member not found")
-        
-    if db_member.user_id is not None:
-        raise HTTPException(status_code=400, detail="Member already claimed by a user")
-    
-    # Generate token
-    token = secrets.token_urlsafe(16)
-    db_member.invite_token = token
-    db.commit()
-    
-    return {"token": token}
-
-from pydantic import BaseModel
-
-class InviteClaim(BaseModel):
-    token: str
-
-@app.post("/invites/claim")
-def claim_invite(invite: InviteClaim, user_id: int, db: Session = Depends(get_db)):
-    """Claim a member profile using an invite token"""
-    db_member = db.query(models.Member).filter(models.Member.invite_token == invite.token).first()
-    
-    if not db_member:
-        raise HTTPException(status_code=404, detail="Invalid invite token")
-        
-    if db_member.user_id is not None:
-        # Should not happen if we clear token, but good safety
-        raise HTTPException(status_code=400, detail="Member already claimed")
-        
-    # Link user
-    db_member.user_id = user_id
-    db_member.invite_token = None # Invalidate token
-    db.commit()
-    
-    return {"message": "Invite claimed", "group_id": db_member.group_id}
-
-
-# Expenses CRUD
-@app.post("/groups/{group_id}/expenses/", response_model=schemas.Expense)
-async def create_expense_for_group(group_id: int, expense: schemas.ExpenseCreate, db: Session = Depends(get_db)):
-    # Fetch group to get currency
-    db_group = db.query(models.Group).filter(models.Group.id == group_id).first()
-    if not db_group:
-        raise HTTPException(status_code=404, detail="Group not found")
-
-    # 1. Create Expense
-    db_expense = models.Expense(
-        description=expense.description,
-        amount=expense.amount,
-        currency_code=db_group.currency,
-        category=expense.category,
-        is_settlement=1 if expense.is_settlement else 0,
-        payer_id=expense.payer_id,
-        group_id=group_id,
-        date=expense.date or datetime.datetime.utcnow()
-    )
-    db.add(db_expense)
-    db.commit()
-    db.refresh(db_expense)
-
-    # 2. Create Splits
-    for split in expense.splits:
-        db_split = models.ExpenseSplit(
-            expense_id=db_expense.id,
-            member_id=split.member_id,
-            amount=split.amount
-        )
-        db.add(db_split)
-    
-    db.commit()
-    db.refresh(db_expense)
-    
-    # Broadcast to group members via WebSocket
-    try:
-        members = db.query(models.Member).filter(models.Member.group_id == group_id).all()
-        notification = {
-            "type": "expense_created",
-            "group_id": group_id,
-            "description": expense.description,
-            "amount": expense.amount,
-            "currency": db_group.currency,
-            "payer_id": expense.payer_id,
-            "message": f"New expense: {expense.description}"
-        }
-        await manager.broadcast_to_group(group_id, notification, members)
-    except Exception as e:
-        print(f"WS Broadcast error: {e}")
-        
-    return db_expense
-
-@app.get("/groups/{group_id}/expenses/", response_model=List[schemas.Expense])
-def read_expenses(group_id: int, db: Session = Depends(get_db)):
-    return db.query(models.Expense).filter(models.Expense.group_id == group_id).all()
-
-@app.put("/groups/{group_id}/expenses/{expense_id}", response_model=schemas.Expense)
-async def update_expense(group_id: int, expense_id: int, expense_update: schemas.ExpenseUpdate, user_id: int, db: Session = Depends(get_db)):
-    # 1. Fetch Expense
-    db_expense = db.query(models.Expense).filter(models.Expense.id == expense_id, models.Expense.group_id == group_id).first()
-    if not db_expense:
-        raise HTTPException(status_code=404, detail="Expense not found")
-
-    # 2. Check Permission: Only Creator/Payer or Admin can edit (Simplification: Payer can edit)
-    # We ideally need to know who created it, but Payer is a good proxy.
-    # Also check if user is admin of group
-    is_admin = db.query(models.Member).filter(
-        models.Member.group_id == group_id,
-        models.Member.user_id == user_id,
-        models.Member.is_admin == 1
-    ).first() is not None
-    
-    # Check if payer is linked to this user
-    payer_member = db.query(models.Member).filter(models.Member.id == db_expense.payer_id).first()
-    is_payer = payer_member and payer_member.user_id == user_id
-    
-    if not (is_admin or is_payer):
-        raise HTTPException(status_code=403, detail="Permission denied")
-
-    # 3. Update Fields
-    if expense_update.description is not None:
-        db_expense.description = expense_update.description
-    if expense_update.amount is not None:
-        db_expense.amount = expense_update.amount
-    if expense_update.category is not None:
-        db_expense.category = expense_update.category
-    if expense_update.payer_id is not None:
-        db_expense.payer_id = expense_update.payer_id
-    if expense_update.date is not None:
-        db_expense.date = expense_update.date
-
-    # 4. Update Splits (Replace Strategy)
-    if expense_update.splits is not None:
-        # Delete old splits
-        db.query(models.ExpenseSplit).filter(models.ExpenseSplit.expense_id == expense_id).delete()
-        # Add new splits
-        for split in expense_update.splits:
-            db_split = models.ExpenseSplit(
-                expense_id=db_expense.id,
-                member_id=split.member_id,
-                amount=split.amount
-            )
-            db.add(db_split)
-
-    db.commit()
-    db.refresh(db_expense)
-    
-    # Notify
-    try:
-        members = db.query(models.Member).filter(models.Member.group_id == group_id).all()
-        notification = {
-            "type": "expense_updated",
-            "group_id": group_id,
-            "message": f"Expense updated: {db_expense.description}"
-        }
-        await manager.broadcast_to_group(group_id, notification, members)
-    except Exception:
-        pass
-
-    return db_expense
-
-@app.delete("/groups/{group_id}/expenses/{expense_id}")
-async def delete_expense(group_id: int, expense_id: int, user_id: int, db: Session = Depends(get_db)):
-    db_expense = db.query(models.Expense).filter(models.Expense.id == expense_id, models.Expense.group_id == group_id).first()
-    if not db_expense:
-        raise HTTPException(status_code=404, detail="Expense not found")
-
-    # Check Permission
-    is_admin = db.query(models.Member).filter(
-        models.Member.group_id == group_id,
-        models.Member.user_id == user_id,
-        models.Member.is_admin == 1
-    ).first() is not None
-    
-    payer_member = db.query(models.Member).filter(models.Member.id == db_expense.payer_id).first()
-    is_payer = payer_member and payer_member.user_id == user_id
-
-    if not (is_admin or is_payer):
-         raise HTTPException(status_code=403, detail="Permission denied")
-
-    db.delete(db_expense) # Splits should cascade delete ideally, or we delete manually
-    # SQLAlchemy default cascade might not be set, let's delete splits manually to be safe or assume cascade 
-    # (Assuming models.py doesn't have cascade set, explicit delete is safer)
-    db.query(models.ExpenseSplit).filter(models.ExpenseSplit.expense_id == expense_id).delete()
-    
-    db.commit()
-    
-    # Notify
-    try:
-        members = db.query(models.Member).filter(models.Member.group_id == group_id).all()
-        notification = {
-            "type": "expense_deleted",
-            "group_id": group_id,
-            "message": "Expense deleted"
-        }
-        await manager.broadcast_to_group(group_id, notification, members)
-    except Exception:
-        pass
-
-    return {"message": "Expense deleted"}
