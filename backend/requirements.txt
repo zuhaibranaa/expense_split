@@ -1,9 +1,0 @@
-fastapi
-uvicorn
-sqlalchemy
-pydantic
-pydantic-settings
-python-multipart
-fastapi-mail
-passlib[bcrypt]
-python-dotenv
