@@ -64,6 +64,20 @@ class PlatformInfo {
   }
 
   static String getDefaultApiBaseUrl() {
-    return 'https://burl-roiliest-harry.ngrok-free.dev';
+    if (isWeb || isDesktop || isIOS) {
+      return 'http://127.0.0.1:8000';
+    } else if (isAndroid) {
+      return 'http://10.0.2.2:8000';
+    }
+    return 'http://127.0.0.1:8000';
+  }
+
+  static String getDefaultWebSocketBaseUrl() {
+    if (isWeb || isDesktop || isIOS) {
+      return 'ws://127.0.0.1:8000';
+    } else if (isAndroid) {
+      return 'ws://10.0.2.2:8000';
+    }
+    return 'ws://127.0.0.1:8000';
   }
 }

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import './../../shared/utils/platform_info.dart';
 
 class WebSocketService {
   WebSocketChannel? _channel;
@@ -16,8 +17,9 @@ class WebSocketService {
 
   void connect(int userId) {
     if (_isConnected) return;
-
-    final uri = Uri.parse('ws://127.0.0.1:8000/ws/$userId');
+    final uri = Uri.parse(
+      '${PlatformInfo.getDefaultWebSocketBaseUrl()}/ws/$userId',
+    );
     try {
       _channel = WebSocketChannel.connect(uri);
       _isConnected = true;
