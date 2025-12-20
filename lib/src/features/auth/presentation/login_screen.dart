@@ -21,6 +21,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isNewUser = false;
 
   bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -56,13 +57,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     try {
       await ref
           .read(authControllerProvider.notifier)
           .login(_emailController.text.trim(), _passwordController.text);
     } catch (e) {
-      // Global error handler shows popup
+      setState(() {
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
     } finally {
       setState(() => _isLoading = false);
     }
@@ -179,15 +185,65 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
+                if (_errorMessage != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline, color: Colors.red),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Error',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                _errorMessage!,
+                                style: const TextStyle(color: Colors.red),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 TextField(
                   controller: _passwordController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Password',
-                    prefixIcon: Icon(Icons.lock_outline),
-                    border: OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    border: const OutlineInputBorder(),
+                    enabledBorder: _errorMessage != null
+                        ? const OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.red),
+                          )
+                        : null,
+                    focusedBorder: _errorMessage != null
+                        ? const OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.red, width: 2),
+                          )
+                        : null,
                   ),
                   obscureText: true,
                   autofocus: true,
+                  onChanged: (_) {
+                    if (_errorMessage != null) {
+                      setState(() => _errorMessage = null);
+                    }
+                  },
                   onSubmitted: (_) =>
                       _isNewUser ? _handleRegisterNext() : _handleLogin(),
                 ),
@@ -205,6 +261,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   onPressed: () => setState(() {
                     _step = 0;
                     _passwordController.clear();
+                    _errorMessage = null;
                   }),
                   child: const Text('Back'),
                 ),

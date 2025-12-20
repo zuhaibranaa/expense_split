@@ -65,19 +65,19 @@ class PlatformInfo {
 
   static String getDefaultApiBaseUrl() {
     if (isWeb || isDesktop || isIOS) {
-      return 'http://127.0.0.1:8000';
+      return 'https://244318532e1d.ngrok-free.app';
     } else if (isAndroid) {
-      return 'http://10.0.2.2:8000';
+      return 'https://244318532e1d.ngrok-free.app';
     }
-    return 'http://127.0.0.1:8000';
+    return 'https://244318532e1d.ngrok-free.app';
   }
 
   static String getDefaultWebSocketBaseUrl() {
     if (isWeb || isDesktop || isIOS) {
-      return 'ws://127.0.0.1:8000';
+      return 'ws://244318532e1d.ngrok-free.app';
     } else if (isAndroid) {
-      return 'ws://10.0.2.2:8000';
+      return 'ws://244318532e1d.ngrok-free.app';
     }
-    return 'ws://127.0.0.1:8000';
+    return 'ws://244318532e1d.ngrok-free.app';
   }
 }

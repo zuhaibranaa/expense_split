@@ -31,7 +31,11 @@ class ApiClient {
     return _handleResponse(response);
   }
 
-  Future<dynamic> post(String endpoint, Map<String, dynamic> body) async {
+  Future<dynamic> post(
+    String endpoint,
+    Map<String, dynamic> body, {
+    bool shouldHandleError = true,
+  }) async {
     try {
       print('ApiClient: POST $endpoint payload: $body');
       final response = await http.post(
@@ -40,7 +44,7 @@ class ApiClient {
         body: jsonEncode(body),
       );
       print('ApiClient: POST $endpoint response: ${response.statusCode}');
-      return _handleResponse(response);
+      return _handleResponse(response, shouldHandleError: shouldHandleError);
     } catch (e) {
       print('ApiClient: POST $endpoint failed: $e');
       rethrow;
@@ -102,7 +106,10 @@ class ApiClient {
     }
   }
 
-  dynamic _handleResponse(http.Response response) {
+  dynamic _handleResponse(
+    http.Response response, {
+    bool shouldHandleError = true,
+  }) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       final body = jsonDecode(response.body);
       // Check for standard success response format
@@ -115,8 +122,12 @@ class ApiClient {
         response.statusCode,
         response.body,
       );
-      GlobalErrorHandler.showError(errorMessage);
-      throw Exception('API Error: ${response.statusCode} ${response.body}');
+      if (shouldHandleError) {
+        GlobalErrorHandler.showError(errorMessage);
+        throw Exception('API Error: ${response.statusCode} ${response.body}');
+      } else {
+        throw Exception(errorMessage);
+      }
     }
   }
 

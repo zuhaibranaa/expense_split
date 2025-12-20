@@ -54,7 +54,7 @@ class AuthRepository {
     final response = await _api.post('/auth/login', {
       'email': email,
       'password': password,
-    });
+    }, shouldHandleError: false);
     _currentUser = User.fromJson(response);
     await _saveSession(_currentUser!);
   }
