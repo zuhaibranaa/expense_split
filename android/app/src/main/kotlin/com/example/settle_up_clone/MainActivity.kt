@@ -1,4 +1,4 @@
-package com.example.settle_up_clone
+package com.expense_split.app
 
 import io.flutter.embedding.android.FlutterActivity
 
