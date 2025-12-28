@@ -201,7 +201,7 @@ class ExpensesListScreen extends ConsumerWidget {
               return Text(
                 '${m.name}: $groupCurrency ${s.amount.toStringAsFixed(2)}',
               );
-            }).toList(),
+            }),
           ],
         ),
         actions: [

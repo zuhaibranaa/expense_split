@@ -160,7 +160,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
                 // Payer
                 DropdownButtonFormField<int>(
-                  value: _selectedPayerId,
+                  initialValue: _selectedPayerId,
                   decoration: const InputDecoration(
                     labelText: 'Paid By',
                     prefixIcon: Icon(Icons.person),
@@ -176,7 +176,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
                 // Category
                 DropdownButtonFormField<String>(
-                  value: _selectedCategory,
+                  initialValue: _selectedCategory,
                   decoration: const InputDecoration(
                     labelText: 'Category',
                     prefixIcon: Icon(Icons.category),
@@ -346,9 +346,10 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       }
 
       double remaining = totalAmount - manualSum;
-      if (remaining < 0)
+      if (remaining < 0) {
         remaining =
             0; // Prevent negative shares if manual exceeds total (or let it go negative? usually 0)
+      }
 
       if (uneditedMembers.isNotEmpty) {
         final baseShare =

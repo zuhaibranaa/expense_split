@@ -18,8 +18,9 @@ class StatsScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Statistics'), centerTitle: true),
       body: groupsAsync.when(
         data: (groups) {
-          if (groups.isEmpty)
+          if (groups.isEmpty) {
             return const Center(child: Text("No groups found"));
+          }
 
           // 2. Fetch Expenses for All Groups (MVP Approach: Client-side Aggregation)
           // In a real app, use a dedicated endpoint /stats
@@ -217,36 +218,34 @@ class _StatsContentState extends ConsumerState<_StatsContent> {
               const SizedBox(height: 16),
 
               // Category List
-              ...sortedCategories
-                  .map(
-                    (e) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: _getCategoryColor(e.key),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(child: Text(e.key)),
-                          Text(
-                            '$userCurrency ${e.value.toStringAsFixed(0)}',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(width: 16),
-                          Text(
-                            '${(e.value / totalSpending * 100).toStringAsFixed(0)}%',
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                        ],
+              ...sortedCategories.map(
+                (e) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: _getCategoryColor(e.key),
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
-                  )
-                  .toList(),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(e.key)),
+                      Text(
+                        '$userCurrency ${e.value.toStringAsFixed(0)}',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        '${(e.value / totalSpending * 100).toStringAsFixed(0)}%',
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         );

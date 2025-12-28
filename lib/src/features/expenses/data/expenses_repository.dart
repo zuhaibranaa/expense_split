@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/data/api_client.dart';
 import '../domain/expense_model.dart';
-import '../../people/domain/member_model.dart'; // Needed if we reference Member
+// Needed if we reference Member
 
 class ExpensesRepository {
   final ApiClient _api;

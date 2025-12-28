@@ -18,8 +18,6 @@ class AppTheme {
         secondary: _secondaryColor,
         surface: _surfaceColor,
         onSurface: _onSurfaceColor,
-        background: _backgroundColor,
-        onBackground: _onSurfaceColor,
       ),
       textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),
       appBarTheme: const AppBarTheme(
@@ -35,9 +33,7 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: _surfaceColor,
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
       ),
       inputDecorationTheme: InputDecorationTheme(

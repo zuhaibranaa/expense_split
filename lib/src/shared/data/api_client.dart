@@ -38,18 +38,14 @@ class ApiClient {
     bool shouldHandleError = true,
   }) async {
     try {
-      print('ApiClient: POST $endpoint payload: $body');
       final uri = Uri.parse('$baseUrl$endpoint');
-      print('ApiClient: Full URI: $uri');
       final response = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(body),
       );
-      print('ApiClient: POST $endpoint response: ${response.statusCode}');
       return _handleResponse(response, shouldHandleError: shouldHandleError);
     } catch (e) {
-      print('ApiClient: POST $endpoint failed: $e');
       rethrow;
     }
   }
@@ -159,8 +155,9 @@ class ApiClient {
     }
 
     if (statusCode == 401) return 'Invalid credentials. Please try again.';
-    if (statusCode == 403)
+    if (statusCode == 403) {
       return 'You do not have permission to perform this action.';
+    }
     if (statusCode == 404) return 'Resource not found.';
     if (statusCode >= 500) return 'Server error. Please try again later.';
 
