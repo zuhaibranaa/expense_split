@@ -65,19 +65,19 @@ class PlatformInfo {
 
   static String getDefaultApiBaseUrl() {
     if (isWeb || isDesktop || isIOS) {
-      return 'https://244318532e1d.ngrok-free.app';
+      return 'https://expense-split-yx4l.onrender.com/';
     } else if (isAndroid) {
-      return 'https://244318532e1d.ngrok-free.app';
+      return 'https://expense-split-yx4l.onrender.com/';
     }
-    return 'https://244318532e1d.ngrok-free.app';
+    return 'https://expense-split-yx4l.onrender.com/';
   }
 
   static String getDefaultWebSocketBaseUrl() {
     if (isWeb || isDesktop || isIOS) {
-      return 'ws://244318532e1d.ngrok-free.app';
+      return 'ws://expense-split-yx4l.onrender.com/';
     } else if (isAndroid) {
-      return 'ws://244318532e1d.ngrok-free.app';
+      return 'ws://expense-split-yx4l.onrender.com/';
     }
-    return 'ws://244318532e1d.ngrok-free.app';
+    return 'ws://expense-split-yx4l.onrender.com/';
   }
 }
