@@ -11,11 +11,12 @@ class ApiClient {
   late final String baseUrl;
 
   ApiClient() {
-    // Automatically detect platform and use appropriate base URL
-    // Web & Desktop: http://127.0.0.1:8000
-    // Android emulator: http://10.0.2.2:8000
-    // iOS simulator: http://localhost:8000
-    baseUrl = PlatformInfo.getDefaultApiBaseUrl();
+    var url = PlatformInfo.getDefaultApiBaseUrl();
+    if (url.endsWith('/')) {
+      url = url.substring(0, url.length - 1);
+    }
+    baseUrl = url;
+
     print('ApiClient: Initialized for ${PlatformInfo.platformName}');
     print('ApiClient: Using Base URL: $baseUrl');
 
@@ -38,8 +39,10 @@ class ApiClient {
   }) async {
     try {
       print('ApiClient: POST $endpoint payload: $body');
+      final uri = Uri.parse('$baseUrl$endpoint');
+      print('ApiClient: Full URI: $uri');
       final response = await http.post(
-        Uri.parse('$baseUrl$endpoint'),
+        uri,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(body),
       );

@@ -40,9 +40,9 @@ class AuthRepository {
 
   Future<bool> checkEmail(String email) async {
     try {
-      final response = await _api.post('/auth/check-email', {
-        'email': email,
-      }); // Removed 'exists: false' from payload
+      final response = await _api.post('/auth/check-email', {'email': email});
+      // final response = await _api.get('/');
+      debugPrint('Check email response: $response');
       return response['exists'] as bool;
     } catch (e) {
       // If error, assume false or rethrow. For now rethrow to handle in UI

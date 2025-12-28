@@ -64,20 +64,10 @@ class PlatformInfo {
   }
 
   static String getDefaultApiBaseUrl() {
-    if (isWeb || isDesktop || isIOS) {
-      return 'https://expense-split-yx4l.onrender.com/';
-    } else if (isAndroid) {
-      return 'https://expense-split-yx4l.onrender.com/';
-    }
-    return 'https://expense-split-yx4l.onrender.com/';
+    return 'https://expense-split-yx4l.onrender.com';
   }
 
   static String getDefaultWebSocketBaseUrl() {
-    if (isWeb || isDesktop || isIOS) {
-      return 'ws://expense-split-yx4l.onrender.com/';
-    } else if (isAndroid) {
-      return 'ws://expense-split-yx4l.onrender.com/';
-    }
-    return 'ws://expense-split-yx4l.onrender.com/';
+    return 'ws://expense-split-yx4l.onrender.com';
   }
 }
