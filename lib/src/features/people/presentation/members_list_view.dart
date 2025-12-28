@@ -16,10 +16,10 @@ class MembersListView extends ConsumerWidget {
     final membersAsync = ref.watch(membersStreamProvider(groupId));
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton.small(
         onPressed: () => _showAddMemberDialog(context, ref),
-        label: const Text('Add Person'),
-        icon: const Icon(Icons.person_add),
+        tooltip: 'Add Person',
+        child: const Icon(Icons.person_add),
       ),
       body: membersAsync.when(
         data: (members) {
@@ -66,9 +66,9 @@ class MembersListView extends ConsumerWidget {
                   ],
                 ),
                 trailing: member.userId == null
-                    ? IconButton(
+                    ? TextButton.icon(
                         icon: const Icon(Icons.link),
-                        tooltip: 'Invite Link',
+                        label: const Text('Invite'),
                         onPressed: () => _generateInvite(context, ref, member),
                       )
                     : null,
@@ -112,9 +112,9 @@ class MembersListView extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
+                    color: Colors.green,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade400),
+                    border: Border.all(color: Colors.blue.shade800),
                   ),
                   child: Center(
                     child: SelectableText(

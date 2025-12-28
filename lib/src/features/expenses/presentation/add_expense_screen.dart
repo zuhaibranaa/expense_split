@@ -100,15 +100,29 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                   (s) => s.memberId == m.id,
                   orElse: () => ExpenseSplit(id: -1, memberId: m.id, amount: 0),
                 );
-                _splitControllers[m.id] = TextEditingController(
+                final c = TextEditingController(
                   text: split.amount.toStringAsFixed(2),
                 );
+                if ((split.amount - (widget.expense!.amount / members.length))
+                            .abs() >
+                        0.01 &&
+                    _splitMethod == SplitMethod.exact) {
+                  // If loaded value differs from equal share, assume manual edit?
+                  // Actually, safer to just add listener.
+                  // But maybe we should mark as manually edited if we want to preserve it?
+                  // The prompt implies behavior during *editing*, not initial load state.
+                  // So we just add listener.
+                }
+                c.addListener(() => _onSplitAmountChanged(m.id, members));
+                _splitControllers[m.id] = c;
               }
             } else if (members.isNotEmpty) {
               _selectedPayerId = members.first.id;
               // Initialize controllers for exact split
               for (var m in members) {
-                _splitControllers[m.id] = TextEditingController(text: '0.00');
+                final c = TextEditingController(text: '0.00');
+                c.addListener(() => _onSplitAmountChanged(m.id, members));
+                _splitControllers[m.id] = c;
               }
             }
           }
@@ -200,6 +214,39 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                   onSelectionChanged: (newSelection) {
                     setState(() {
                       _splitMethod = newSelection.first;
+                      if (_splitMethod == SplitMethod.exact) {
+                        final totalAmount =
+                            double.tryParse(_amountController.text) ?? 0.0;
+                        if (totalAmount > 0 && members.isNotEmpty) {
+                          final baseShare =
+                              (totalAmount / members.length * 100).floor() /
+                              100.0;
+                          double remainder =
+                              totalAmount - (baseShare * members.length);
+
+                          _manuallyEditedMemberIds.clear();
+                          _isProgrammaticUpdate = true;
+                          for (var i = 0; i < members.length; i++) {
+                            double share = baseShare;
+                            if (i < (remainder * 100).round()) {
+                              share += 0.01;
+                            }
+                            if (!_splitControllers.containsKey(members[i].id)) {
+                              final c = TextEditingController(text: '0.00');
+                              c.addListener(
+                                () => _onSplitAmountChanged(
+                                  members[i].id,
+                                  members,
+                                ),
+                              );
+                              _splitControllers[members[i].id] = c;
+                            }
+                            _splitControllers[members[i].id]?.text = share
+                                .toStringAsFixed(2);
+                          }
+                          _isProgrammaticUpdate = false;
+                        }
+                      }
                     });
                   },
                 ),
@@ -255,7 +302,83 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     );
   }
 
+  final Set<int> _manuallyEditedMemberIds = {};
+  bool _isProgrammaticUpdate = false;
+
+  void _onSplitAmountChanged(int changedMemberId, List<Member> members) {
+    if (_isProgrammaticUpdate) return;
+    if (_splitMethod != SplitMethod.exact) return;
+
+    setState(() {
+      _manuallyEditedMemberIds.add(changedMemberId);
+    });
+
+    final totalAmount = double.tryParse(_amountController.text) ?? 0.0;
+
+    // Check if all members are manually edited
+    final allEdited = members.every(
+      (m) => _manuallyEditedMemberIds.contains(m.id),
+    );
+
+    if (allEdited) {
+      // All manual: Update total from sum of splits
+      double sum = 0.0;
+      for (var m in members) {
+        sum += double.tryParse(_splitControllers[m.id]?.text ?? '0') ?? 0.0;
+      }
+      if ((sum - totalAmount).abs() > 0.01) {
+        _isProgrammaticUpdate = true;
+        _amountController.text = sum.toStringAsFixed(2);
+        _isProgrammaticUpdate = false;
+      }
+    } else {
+      // Some unedited: Distribute remaining among them
+      double manualSum = 0.0;
+      final uneditedMembers = <Member>[];
+
+      for (var m in members) {
+        if (_manuallyEditedMemberIds.contains(m.id)) {
+          manualSum +=
+              double.tryParse(_splitControllers[m.id]?.text ?? '0') ?? 0.0;
+        } else {
+          uneditedMembers.add(m);
+        }
+      }
+
+      double remaining = totalAmount - manualSum;
+      if (remaining < 0)
+        remaining =
+            0; // Prevent negative shares if manual exceeds total (or let it go negative? usually 0)
+
+      if (uneditedMembers.isNotEmpty) {
+        final baseShare =
+            (remaining / uneditedMembers.length * 100).floor() / 100.0;
+        double leftover = remaining - (baseShare * uneditedMembers.length);
+
+        _isProgrammaticUpdate = true;
+        for (var i = 0; i < uneditedMembers.length; i++) {
+          double share = baseShare;
+          if (i < (leftover * 100).round()) {
+            share += 0.01;
+          }
+          _splitControllers[uneditedMembers[i].id]?.text = share
+              .toStringAsFixed(2);
+        }
+        _isProgrammaticUpdate = false;
+      }
+    }
+  }
+
   Widget _buildExactSplitView(List<Member> members) {
+    // Ensure controllers exist and have listeners
+    for (var m in members) {
+      if (!_splitControllers.containsKey(m.id)) {
+        final c = TextEditingController(text: '0.00');
+        c.addListener(() => _onSplitAmountChanged(m.id, members));
+        _splitControllers[m.id] = c;
+      }
+    }
+
     return Column(
       children: members.map((member) {
         return Padding(
