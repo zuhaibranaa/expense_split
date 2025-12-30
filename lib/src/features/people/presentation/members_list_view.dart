@@ -5,6 +5,7 @@ import '../../groups/data/groups_repository.dart';
 import '../../auth/data/auth_repository.dart';
 import '../data/members_repository.dart';
 import '../../people/domain/member_model.dart';
+import 'member_profile_screen.dart';
 
 class MembersListView extends ConsumerWidget {
   final int groupId;
@@ -32,7 +33,12 @@ class MembersListView extends ConsumerWidget {
               final member = members[index];
               return ListTile(
                 leading: CircleAvatar(
-                  child: Text(member.name[0].toUpperCase()),
+                  backgroundImage: member.avatarUrl != null
+                      ? NetworkImage(member.avatarUrl!)
+                      : null,
+                  child: member.avatarUrl == null
+                      ? Text(member.name[0].toUpperCase())
+                      : null,
                 ),
                 title: Text(member.name),
                 subtitle: Row(
@@ -71,7 +77,17 @@ class MembersListView extends ConsumerWidget {
                         label: const Text('Invite'),
                         onPressed: () => _generateInvite(context, ref, member),
                       )
-                    : null,
+                    : const Icon(Icons.chevron_right),
+                onTap: () {
+                  if (member.userId != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MemberProfileScreen(member: member),
+                      ),
+                    );
+                  }
+                },
               );
             },
           );

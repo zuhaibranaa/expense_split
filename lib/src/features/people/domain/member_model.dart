@@ -6,6 +6,8 @@ class Member {
   final int isAdmin; // 1 for admin, 0 for regular member
   final String? iban;
   final String? avatarUrl;
+  final String? email;
+  final String? phone;
 
   Member({
     required this.id,
@@ -15,6 +17,8 @@ class Member {
     this.isAdmin = 0,
     this.iban,
     this.avatarUrl,
+    this.email,
+    this.phone,
   });
 
   factory Member.fromJson(Map<String, dynamic> json) {
@@ -27,6 +31,8 @@ class Member {
       isAdmin: json['is_admin'] ?? 0,
       iban: user != null ? user['iban'] : null,
       avatarUrl: user != null ? user['avatar_url'] : null,
+      email: user != null ? json['email'] : null,
+      phone: user != null ? user['phone'] : null,
     );
   }
 }
