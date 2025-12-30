@@ -182,7 +182,7 @@ class _StatsContentState extends ConsumerState<_StatsContent> {
                     PieChart(
                       PieChartData(
                         sectionsSpace: 0,
-                        centerSpaceRadius: 40,
+                        centerSpaceRadius: 60,
                         sections: sortedCategories.map((e) {
                           return PieChartSectionData(
                             color: _getCategoryColor(e.key),
@@ -281,7 +281,7 @@ class _StatsContentState extends ConsumerState<_StatsContent> {
       case 'Entertainment':
         return Colors.pink;
       default:
-        return Colors.grey;
+        return Colors.lightBlue;
     }
   }
 }
