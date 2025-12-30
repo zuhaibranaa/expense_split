@@ -31,6 +31,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   int? _selectedPayerId;
   String _selectedCategory = 'General';
 
+  final Set<int> _selectedMemberIds = {};
   SplitMethod _splitMethod = SplitMethod.equal;
   final Map<int, TextEditingController> _splitControllers = {};
   bool _isInit = true;
@@ -44,11 +45,12 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       _selectedPayerId = widget.expense!.payerId;
       _selectedCategory = widget.expense!.category;
 
-      // Handle splits
-      // Start by initializing for all (will require members, so we do it in build/submit or logic below)
-      // Actually, we can't initialize controllers here because we don't have members yet.
-      // We'll rely on the FutureBuilder in build to initialize defaults, but we need to flag that we are editing.
-      // To pre-fill custom splits, we'll need to match members.
+      // Initialize selected members from existing splits
+      if (widget.expense!.splits.isNotEmpty) {
+        _selectedMemberIds.addAll(
+          widget.expense!.splits.map((s) => s.memberId),
+        );
+      }
     }
     _isInit = false;
   }
@@ -75,13 +77,26 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             return const Center(child: Text('Add people to the group first!'));
           }
 
-          // Default payer initialization or Edit Mode pre-fill
+          // Default initialization
           if (_selectedPayerId == null) {
+            if (widget.expense == null) {
+              // New Expense: Select all by default
+              if (_selectedMemberIds.isEmpty) {
+                _selectedMemberIds.addAll(members.map((m) => m.id));
+              }
+              _selectedPayerId = members.first.id;
+            } else {
+              // Editing: _selectedMemberIds already handled in didChangeDependencies
+              // But we need to ensure at least one is selected? or just fallback to all if empty which shouldn't happen for valid expense
+              if (_selectedMemberIds.isEmpty) {
+                _selectedMemberIds.addAll(members.map((m) => m.id));
+              }
+            }
+
+            // Initialize controllers + method
             if (widget.expense != null) {
-              // Pre-fill from expense
               _selectedPayerId = widget.expense!.payerId;
-              // Check if splits are equal or exact
-              // Simple heuristic: if all splits are equal amount (approx) -> Equal, else Exact
+
               bool isEqual = true;
               if (widget.expense!.splits.isNotEmpty) {
                 final firstAmount = widget.expense!.splits.first.amount;
@@ -94,7 +109,6 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               }
               _splitMethod = isEqual ? SplitMethod.equal : SplitMethod.exact;
 
-              // Init controllers
               for (var m in members) {
                 final split = widget.expense!.splits.firstWhere(
                   (s) => s.memberId == m.id,
@@ -103,22 +117,11 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 final c = TextEditingController(
                   text: split.amount.toStringAsFixed(2),
                 );
-                if ((split.amount - (widget.expense!.amount / members.length))
-                            .abs() >
-                        0.01 &&
-                    _splitMethod == SplitMethod.exact) {
-                  // If loaded value differs from equal share, assume manual edit?
-                  // Actually, safer to just add listener.
-                  // But maybe we should mark as manually edited if we want to preserve it?
-                  // The prompt implies behavior during *editing*, not initial load state.
-                  // So we just add listener.
-                }
                 c.addListener(() => _onSplitAmountChanged(m.id, members));
                 _splitControllers[m.id] = c;
               }
-            } else if (members.isNotEmpty) {
-              _selectedPayerId = members.first.id;
-              // Initialize controllers for exact split
+            } else {
+              // New Expense Controllers
               for (var m in members) {
                 final c = TextEditingController(text: '0.00');
                 c.addListener(() => _onSplitAmountChanged(m.id, members));
@@ -154,7 +157,11 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  onChanged: (val) => setState(() {}),
+                  onChanged: (val) {
+                    setState(
+                      () {},
+                    ); // Rebuild to update exact/equal calculations if needed
+                  },
                 ),
                 const SizedBox(height: 16),
 
@@ -198,6 +205,21 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 ),
                 const SizedBox(height: 24),
 
+                // Split With Selection
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Split with'),
+                  subtitle: Text(
+                    _selectedMemberIds.length == members.length
+                        ? 'All (${members.length})'
+                        : '${_selectedMemberIds.length} people selected',
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () => _showMemberSelectionDialog(members),
+                ),
+                const Divider(),
+                const SizedBox(height: 16),
+
                 // Split Method Toggle
                 SegmentedButton<SplitMethod>(
                   segments: const [
@@ -207,7 +229,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     ),
                     ButtonSegment(
                       value: SplitMethod.exact,
-                      label: Text('Exact Amount'),
+                      label: Text('Exact'),
                     ),
                   ],
                   selected: {_splitMethod},
@@ -215,37 +237,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     setState(() {
                       _splitMethod = newSelection.first;
                       if (_splitMethod == SplitMethod.exact) {
-                        final totalAmount =
-                            double.tryParse(_amountController.text) ?? 0.0;
-                        if (totalAmount > 0 && members.isNotEmpty) {
-                          final baseShare =
-                              (totalAmount / members.length * 100).floor() /
-                              100.0;
-                          double remainder =
-                              totalAmount - (baseShare * members.length);
-
-                          _manuallyEditedMemberIds.clear();
-                          _isProgrammaticUpdate = true;
-                          for (var i = 0; i < members.length; i++) {
-                            double share = baseShare;
-                            if (i < (remainder * 100).round()) {
-                              share += 0.01;
-                            }
-                            if (!_splitControllers.containsKey(members[i].id)) {
-                              final c = TextEditingController(text: '0.00');
-                              c.addListener(
-                                () => _onSplitAmountChanged(
-                                  members[i].id,
-                                  members,
-                                ),
-                              );
-                              _splitControllers[members[i].id] = c;
-                            }
-                            _splitControllers[members[i].id]?.text = share
-                                .toStringAsFixed(2);
-                          }
-                          _isProgrammaticUpdate = false;
-                        }
+                        _recalculateExactSplits(members);
                       }
                     });
                   },
@@ -281,20 +273,117 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     );
   }
 
+  void _recalculateExactSplits(List<Member> members) {
+    final totalAmount = double.tryParse(_amountController.text) ?? 0.0;
+    final activeMembers = members
+        .where((m) => _selectedMemberIds.contains(m.id))
+        .toList();
+
+    if (totalAmount > 0 && activeMembers.isNotEmpty) {
+      final baseShare =
+          (totalAmount / activeMembers.length * 100).floor() / 100.0;
+      double remainder = totalAmount - (baseShare * activeMembers.length);
+
+      _manuallyEditedMemberIds.clear();
+      _isProgrammaticUpdate = true;
+
+      // Reset all controllers first to 0
+      for (var m in members) {
+        _splitControllers[m.id]?.text = "0.00";
+      }
+
+      for (var i = 0; i < activeMembers.length; i++) {
+        double share = baseShare;
+        if (i < (remainder * 100).round()) {
+          share += 0.01;
+        }
+        _splitControllers[activeMembers[i].id]?.text = share.toStringAsFixed(2);
+      }
+      _isProgrammaticUpdate = false;
+    }
+  }
+
+  Future<void> _showMemberSelectionDialog(List<Member> members) async {
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Split with'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: members.map((m) {
+                    return CheckboxListTile(
+                      title: Text(m.name),
+                      value: _selectedMemberIds.contains(m.id),
+                      onChanged: (bool? value) {
+                        setState(() {
+                          if (value == true) {
+                            _selectedMemberIds.add(m.id);
+                          } else {
+                            // prevent deselecting the last one?
+                            if (_selectedMemberIds.length > 1) {
+                              _selectedMemberIds.remove(m.id);
+                            }
+                          }
+                        });
+                        // Update parent state too to reflect changes immediately if needed,
+                        // but usually we wait for dialog close. However, to keep UI sync:
+                        this.setState(() {});
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    // Recalculate if in Exact mode when closing
+                    if (_splitMethod == SplitMethod.exact) {
+                      _recalculateExactSplits(members);
+                    }
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Done'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildEqualSplitView(List<Member> members) {
     final totalAmount = double.tryParse(_amountController.text) ?? 0.0;
-    final perPerson = members.isNotEmpty ? totalAmount / members.length : 0.0;
+    final count = _selectedMemberIds.length;
+    final perPerson = count > 0 ? totalAmount / count : 0.0;
 
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Text('Split equally between ${members.length} people'),
+            Text('Split equally between $count people'),
             const SizedBox(height: 4),
             Text(
               '${widget.groupCurrency} ${perPerson.toStringAsFixed(2)} / person',
               style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            // List who is included
+            Wrap(
+              spacing: 8,
+              children: members
+                  .where((m) => _selectedMemberIds.contains(m.id))
+                  .map((m) {
+                    return Chip(
+                      label: Text(m.name, style: const TextStyle(fontSize: 10)),
+                    );
+                  })
+                  .toList(),
             ),
           ],
         ),
@@ -309,21 +398,29 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     if (_isProgrammaticUpdate) return;
     if (_splitMethod != SplitMethod.exact) return;
 
+    // If changing a member that isn't selected, maybe auto-select them?
+    // For now, let's assume UI handles visibility, but logic needs safety.
+    if (!_selectedMemberIds.contains(changedMemberId)) return;
+
     setState(() {
       _manuallyEditedMemberIds.add(changedMemberId);
     });
 
     final totalAmount = double.tryParse(_amountController.text) ?? 0.0;
 
-    // Check if all members are manually edited
-    final allEdited = members.every(
+    final activeMembers = members
+        .where((m) => _selectedMemberIds.contains(m.id))
+        .toList();
+
+    // Check if all active members are manually edited
+    final allEdited = activeMembers.every(
       (m) => _manuallyEditedMemberIds.contains(m.id),
     );
 
     if (allEdited) {
       // All manual: Update total from sum of splits
       double sum = 0.0;
-      for (var m in members) {
+      for (var m in activeMembers) {
         sum += double.tryParse(_splitControllers[m.id]?.text ?? '0') ?? 0.0;
       }
       if ((sum - totalAmount).abs() > 0.01) {
@@ -336,7 +433,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       double manualSum = 0.0;
       final uneditedMembers = <Member>[];
 
-      for (var m in members) {
+      for (var m in activeMembers) {
         if (_manuallyEditedMemberIds.contains(m.id)) {
           manualSum +=
               double.tryParse(_splitControllers[m.id]?.text ?? '0') ?? 0.0;
@@ -347,8 +444,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
       double remaining = totalAmount - manualSum;
       if (remaining < 0) {
-        remaining =
-            0; // Prevent negative shares if manual exceeds total (or let it go negative? usually 0)
+        remaining = 0;
       }
 
       if (uneditedMembers.isNotEmpty) {
@@ -380,8 +476,13 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       }
     }
 
+    // Only show members that are selected
+    final activeMembers = members
+        .where((m) => _selectedMemberIds.contains(m.id))
+        .toList();
+
     return Column(
-      children: members.map((member) {
+      children: activeMembers.map((member) {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Row(
@@ -425,17 +526,31 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       return;
     }
 
+    // Filter to ensure only valid, currently existing members are included
+    final activeMembers = members
+        .where((m) => _selectedMemberIds.contains(m.id))
+        .toList();
+
+    if (activeMembers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select at least one person to split with'),
+        ),
+      );
+      return;
+    }
+
     // Calculate Splits
     final Map<int, double> splits = {};
     if (_splitMethod == SplitMethod.equal) {
-      final splitAmount = totalAmount / members.length;
-      for (var m in members) {
+      final splitAmount = totalAmount / activeMembers.length;
+      for (var m in activeMembers) {
         splits[m.id] = splitAmount;
       }
     } else {
       // Exact split logic
       double sumCheck = 0.0;
-      for (var m in members) {
+      for (var m in activeMembers) {
         final val =
             double.tryParse(_splitControllers[m.id]?.text ?? '0') ?? 0.0;
         splits[m.id] = val;
