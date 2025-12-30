@@ -1,6 +1,6 @@
 {
-    "name": "settle_up_clone",
-    "short_name": "settle_up_clone",
+    "name": "Expense Split",
+    "short_name": "Expense Split",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

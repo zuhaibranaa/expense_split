@@ -10,7 +10,7 @@ class SettleUpApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'SettleUp Clone',
+      title: 'Expense Split',
       navigatorKey: navigatorKey,
       theme: AppTheme.darkTheme,
       home: const AuthGate(),

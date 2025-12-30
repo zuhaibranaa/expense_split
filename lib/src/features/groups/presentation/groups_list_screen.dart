@@ -15,7 +15,7 @@ class GroupsListScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('SettleUp Groups'),
+        title: const Text('Expense Split Groups'),
         actions: [
           IconButton(
             icon: const Icon(Icons.group_add),

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:settle_up_clone/src/features/groups/data/groups_repository.dart';
-import 'package:settle_up_clone/src/features/expenses/data/expenses_repository.dart';
-import 'package:settle_up_clone/src/features/expenses/domain/expense_model.dart';
-import 'package:settle_up_clone/src/features/auth/data/auth_repository.dart';
+import 'package:expense_split/src/features/groups/data/groups_repository.dart';
+import 'package:expense_split/src/features/expenses/data/expenses_repository.dart';
+import 'package:expense_split/src/features/expenses/domain/expense_model.dart';
+import 'package:expense_split/src/features/auth/data/auth_repository.dart';
 
 class StatsScreen extends ConsumerWidget {
   const StatsScreen({super.key});

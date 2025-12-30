@@ -1,4 +1,4 @@
-# SettleUp Clone
+# Expense Split
 
 A cross-platform expense splitting and group management application built with Flutter. Split bills, track expenses, and manage group finances across all your devices.
 

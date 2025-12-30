@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "settle_up_clone" "\0"
+            VALUE "FileDescription", "Expense Split" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "settle_up_clone" "\0"
+            VALUE "InternalName", "expense_split" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2025 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "settle_up_clone.exe" "\0"
-            VALUE "ProductName", "settle_up_clone" "\0"
+            VALUE "OriginalFilename", "expense_split.exe" "\0"
+            VALUE "ProductName", "Expense Split" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

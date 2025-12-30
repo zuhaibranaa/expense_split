@@ -134,7 +134,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               if (_step == 0) ...[
                 Text(
-                  'Welcome to SettleUp',
+                  'Welcome to Expense Split',
                   style: Theme.of(context).textTheme.headlineSmall,
                   textAlign: TextAlign.center,
                 ),
