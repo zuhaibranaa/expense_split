@@ -48,7 +48,7 @@ class GroupsRepository {
 
   Future<String> generateInvite(int groupId, int memberId, int userId) async {
     final response = await _api.post(
-      '/groups/$groupId/members/$memberId/invite?user_id=$userId',
+      '/members/$memberId/invite?user_id=$userId',
       {},
     );
     return response['token'];
