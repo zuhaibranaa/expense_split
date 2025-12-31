@@ -23,12 +23,21 @@ class Member {
 
   factory Member.fromJson(Map<String, dynamic> json) {
     final user = json['user'];
+    var isAdminInt = 0;
+    if (json['is_admin'] != null) {
+      if (json['is_admin'] is bool) {
+        isAdminInt = json['is_admin'] ? 1 : 0;
+      } else if (json['is_admin'] is int) {
+        isAdminInt = json['is_admin'];
+      }
+    }
+
     return Member(
       id: json['id'],
       name: json['name'],
       groupId: json['group_id'],
       userId: json['user_id'],
-      isAdmin: json['is_admin'] ?? 0,
+      isAdmin: isAdminInt,
       iban: user != null ? user['iban'] : null,
       avatarUrl: user != null ? user['avatar_url'] : null,
       email: user != null ? json['email'] : null,

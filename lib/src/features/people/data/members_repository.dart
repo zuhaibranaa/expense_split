@@ -37,14 +37,8 @@ final membersRepositoryProvider = Provider<MembersRepository>((ref) {
   return MembersRepository(api);
 });
 
-final membersStreamProvider = StreamProvider.autoDispose
-    .family<List<Member>, int>((ref, groupId) async* {
+final membersFutureProvider = FutureProvider.autoDispose
+    .family<List<Member>, int>((ref, groupId) async {
       final repo = ref.watch(membersRepositoryProvider);
-      // Initial fetch
-      yield await repo.getMembers(groupId);
-
-      // Polling
-      await for (final _ in Stream.periodic(const Duration(seconds: 5))) {
-        yield await repo.getMembers(groupId);
-      }
+      return await repo.getMembers(groupId);
     });

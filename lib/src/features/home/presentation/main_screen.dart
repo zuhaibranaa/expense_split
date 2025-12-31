@@ -5,7 +5,6 @@ import '../../auth/presentation/profile_screen.dart';
 import '../../analytics/presentation/stats_screen.dart';
 import '../../analytics/presentation/global_settlements_screen.dart';
 import '../../auth/data/auth_repository.dart';
-import '../../../core/network/websocket_service.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
   const MainScreen({super.key});

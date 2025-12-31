@@ -75,25 +75,17 @@ final groupsRepositoryProvider = Provider<GroupsRepository>((ref) {
   return GroupsRepository(api);
 });
 
-final groupsListStreamProvider = StreamProvider.autoDispose<List<Group>>((
+final groupsListFutureProvider = FutureProvider.autoDispose<List<Group>>((
   ref,
-) async* {
+) async {
   final repo = ref.watch(groupsRepositoryProvider);
   final user = ref.watch(authControllerProvider).value;
 
   if (user == null) {
-    yield [];
-    return;
+    return [];
   }
 
-  // Initial fetch
-  yield await repo.getGroups(user.id);
-
-  // Simple polling
-  await for (final _ in Stream.periodic(const Duration(seconds: 5))) {
-    // Check if mounted/active? (StreamProvider handles dispose)
-    yield await repo.getGroups(user.id);
-  }
+  return await repo.getGroups(user.id);
 });
 
 final groupMembersProvider = FutureProvider.family<List<Member>, int>((

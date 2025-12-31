@@ -18,9 +18,6 @@ class ApiClient {
     }
     baseUrl = url;
 
-    print('ApiClient: Initialized for ${PlatformInfo.platformName}');
-    print('ApiClient: Using Base URL: $baseUrl');
-
     if (kDebugMode) {
       print(
         'ApiClient initialized for ${PlatformInfo.platformName} with baseUrl: $baseUrl',
@@ -28,8 +25,34 @@ class ApiClient {
     }
   }
 
+  String? _authToken;
+
+  void setToken(String token) {
+    _authToken = token;
+  }
+
+  void clearToken() {
+    _authToken = null;
+  }
+
+  Map<String, String> _getHeaders() {
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    if (_authToken != null) {
+      headers['Authorization'] = 'Bearer $_authToken';
+    }
+    return headers;
+  }
+
   Future<dynamic> get(String endpoint) async {
-    final response = await http.get(Uri.parse('$baseUrl$endpoint'));
+    final response = await http.get(
+      Uri.parse('$baseUrl$endpoint'),
+      headers: _getHeaders(),
+    );
+    debugPrint('$baseUrl$endpoint');
+    debugPrint(response.body.toString());
     return _handleResponse(response);
   }
 
@@ -42,7 +65,7 @@ class ApiClient {
       final uri = Uri.parse('$baseUrl$endpoint');
       final response = await http.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: _getHeaders(),
         body: jsonEncode(body),
       );
       return _handleResponse(response, shouldHandleError: shouldHandleError);
@@ -54,14 +77,17 @@ class ApiClient {
   Future<dynamic> put(String endpoint, Map<String, dynamic> body) async {
     final response = await http.put(
       Uri.parse('$baseUrl$endpoint'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _getHeaders(),
       body: jsonEncode(body),
     );
     return _handleResponse(response);
   }
 
   Future<dynamic> delete(String endpoint) async {
-    final response = await http.delete(Uri.parse('$baseUrl$endpoint'));
+    final response = await http.delete(
+      Uri.parse('$baseUrl$endpoint'),
+      headers: _getHeaders(),
+    );
     return _handleResponse(response);
   }
 
@@ -76,6 +102,11 @@ class ApiClient {
       'POST',
       Uri.parse('$baseUrl$endpoint'),
     );
+
+    // Add auth header to multipart request
+    if (_authToken != null) {
+      request.headers['Authorization'] = 'Bearer $_authToken';
+    }
 
     if (fileBytes != null) {
       request.files.add(
@@ -112,9 +143,16 @@ class ApiClient {
   }) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       final body = jsonDecode(response.body);
-      // Check for standard success response format
-      if (body is Map<String, dynamic> && body['status'] == 'success') {
-        return body['data'];
+      // Check for standard success response format {status: true, ...}
+      if (body is Map<String, dynamic>) {
+        // The user stated: {status: true, message: Success, data: {...}}
+        if (body['status'] == true) {
+          return body['data'];
+        }
+        // Fallback if status is string "success" or just missing
+        if (body['status'] == 'success') {
+          return body['data'];
+        }
       }
       return body;
     } else {
@@ -135,20 +173,16 @@ class ApiClient {
     try {
       final json = jsonDecode(responseBody);
       if (json is Map<String, dynamic>) {
-        // Standard ApiError format
-        if (json['status'] == 'error' && json.containsKey('message')) {
-          // If validation errors exist, maybe append them?
+        if (json.containsKey('message')) {
+          // If 'errors' field exists (Laravel validation errors likely), append it
           if (json['errors'] != null) {
             return "${json['message']} (${json['errors']})";
           }
           return json['message'].toString();
         }
-        // Legacy formats
-        if (json.containsKey('detail')) {
-          return json['detail'].toString();
-        }
-        if (json.containsKey('message')) {
-          return json['message'].toString();
+        // Legacy/Other formats
+        if (json['status'] == false && json.containsKey('error')) {
+          return json['error'].toString();
         }
       }
     } catch (e) {

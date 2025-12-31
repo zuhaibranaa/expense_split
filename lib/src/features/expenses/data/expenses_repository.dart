@@ -79,11 +79,8 @@ final expensesRepositoryProvider = Provider<ExpensesRepository>((ref) {
 });
 
 // Replaces watchGroupExpenses
-final expensesStreamProvider = StreamProvider.autoDispose
-    .family<List<Expense>, int>((ref, groupId) async* {
+final expensesFutureProvider = FutureProvider.autoDispose
+    .family<List<Expense>, int>((ref, groupId) async {
       final repo = ref.watch(expensesRepositoryProvider);
-      yield await repo.getExpenses(groupId);
-      await for (final _ in Stream.periodic(const Duration(seconds: 5))) {
-        yield await repo.getExpenses(groupId);
-      }
+      return await repo.getExpenses(groupId);
     });

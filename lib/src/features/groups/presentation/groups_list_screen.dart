@@ -11,7 +11,7 @@ class GroupsListScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final groupsAsync = ref.watch(groupsListStreamProvider);
+    final groupsAsync = ref.watch(groupsListFutureProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -49,7 +49,7 @@ class GroupsListScreen extends ConsumerWidget {
           }
           return RefreshIndicator(
             onRefresh: () async {
-              return await ref.refresh(groupsListStreamProvider.future);
+              return await ref.refresh(groupsListFutureProvider.future);
             },
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -74,9 +74,7 @@ class GroupsListScreen extends ConsumerWidget {
                             width: 50,
                             height: 50,
                             decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.primary.withOpacity(0.1),
+                              color: Colors.white.withValues(alpha: 0.7),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             alignment: Alignment.center,

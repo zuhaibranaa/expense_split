@@ -14,7 +14,7 @@ class MembersListView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final membersAsync = ref.watch(membersStreamProvider(groupId));
+    final membersAsync = ref.watch(membersFutureProvider(groupId));
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.small(
@@ -29,7 +29,7 @@ class MembersListView extends ConsumerWidget {
           }
           return RefreshIndicator(
             onRefresh: () async {
-              return await ref.refresh(membersStreamProvider(groupId).future);
+              return await ref.refresh(membersFutureProvider(groupId).future);
             },
             child: ListView.builder(
               itemCount: members.length,

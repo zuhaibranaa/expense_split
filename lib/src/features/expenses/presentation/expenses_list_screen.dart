@@ -22,7 +22,7 @@ class ExpensesListScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final expensesAsync = ref.watch(expensesStreamProvider(groupId));
+    final expensesAsync = ref.watch(expensesFutureProvider(groupId));
     final membersAsync = ref.watch(groupMembersProvider(groupId));
 
     // Listen for WebSocket events for this group
@@ -30,7 +30,7 @@ class ExpensesListScreen extends ConsumerWidget {
       next.whenData((event) {
         if (event['group_id'] == groupId) {
           // Refresh expenses
-          ref.invalidate(expensesStreamProvider(groupId));
+          ref.invalidate(expensesFutureProvider(groupId));
 
           // Show notification if it's a new expense (and not by me? backend doesn't tell 'me' distinctively yet, but user knows)
           if (event['type'] == 'expense_created') {
@@ -68,7 +68,7 @@ class ExpensesListScreen extends ConsumerWidget {
           }
           return RefreshIndicator(
             onRefresh: () async {
-              return await ref.refresh(expensesStreamProvider(groupId).future);
+              return await ref.refresh(expensesFutureProvider(groupId).future);
             },
             child: ListView.builder(
               itemCount: items.length,

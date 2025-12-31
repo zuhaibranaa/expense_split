@@ -195,7 +195,9 @@ class GlobalSettlementsScreen extends ConsumerWidget {
                                     ),
                                   );
                                   // Refresh list
-                                  ref.refresh(globalSettlementsProvider);
+                                  return ref.refresh(
+                                    globalSettlementsProvider.future,
+                                  );
                                 },
                                 icon: const Icon(Icons.payment, size: 16),
                                 label: const Text('Pay'),

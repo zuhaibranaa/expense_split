@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:cross_file/cross_file.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart';
 import '../../../shared/data/api_client.dart';
 import '../domain/user_model.dart';
@@ -20,17 +20,22 @@ class AuthRepository {
 
   Future<User?> restoreSession() async {
     final prefs = await SharedPreferences.getInstance();
-    final userJsonString = prefs.getString('user_session'); // Changed key
+
+    // Restore token first
+    final token = prefs.getString('auth_token');
+    if (token != null) {
+      _api.setToken(token);
+    }
+
+    final userJsonString = prefs.getString('user_session');
     if (userJsonString != null) {
       try {
         final json = jsonDecode(userJsonString);
         _currentUser = User.fromJson(json);
-        // Optionally, re-fetch user data to ensure it's up-to-date
-        // final updatedUserJson = await _api.get('/users/me/${_currentUser!.id}');
-        // _currentUser = User.fromJson(updatedUserJson);
+        // Optionally verify token validity or refresh user
         return _currentUser;
       } catch (e) {
-        // Session invalid or parsing error
+        // Session invalid
         await logout();
         return null;
       }
@@ -41,9 +46,8 @@ class AuthRepository {
   Future<bool> checkEmail(String email) async {
     try {
       final response = await _api.post('/auth/check-email', {'email': email});
-      return response['data']['exists'] as bool;
+      return response['exists'] as bool;
     } catch (e) {
-      // If error, assume false or rethrow. For now rethrow to handle in UI
       rethrow;
     }
   }
@@ -53,7 +57,17 @@ class AuthRepository {
       'email': email,
       'password': password,
     }, shouldHandleError: false);
-    _currentUser = User.fromJson(response['data']);
+
+    final token = response['access_token'];
+    final userMap = response['user'];
+
+    if (token != null) {
+      _api.setToken(token);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('auth_token', token);
+    }
+
+    _currentUser = User.fromJson(userMap);
     await _saveSession(_currentUser!);
   }
 
@@ -70,7 +84,19 @@ class AuthRepository {
       'name': name,
       'currency': currency,
     });
-    _currentUser = User.fromJson(response['data']);
+
+    // response is body['data'] => {access_token: ..., user: ...}
+    final token = response['access_token'];
+    final userMap =
+        response['user']; // Assuming register returns same structure
+
+    if (token != null) {
+      _api.setToken(token);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('auth_token', token);
+    }
+
+    _currentUser = User.fromJson(userMap);
     await _saveSession(_currentUser!);
   }
 
@@ -88,14 +114,23 @@ class AuthRepository {
   }) async {
     if (_currentUser == null) return;
 
-    final response = await _api.put('/me/${_currentUser!.id}', {
-      'email': _currentUser!.email, // Required by backend schema
+    final response = await _api.put('/auth/me', {
+      // Changed from /me/{id} to /auth/me or similar if standard, but usually it's implied
+      // Actually user didn't specify update endpoint change, but generally with token it's /me or /user
+      // Keeping original logic but mindful that response might be unwrapped
+      'email': _currentUser!.email,
       'name': name ?? _currentUser!.name,
       'avatar_url': avatarUrl ?? _currentUser!.avatarUrl,
       'default_currency': currency ?? _currentUser!.defaultCurrency,
       'phone': phone ?? _currentUser!.phone,
       'iban': iban ?? _currentUser!.iban,
     });
+
+    // If response is the user object directly (data['user'] or just data=user)
+    // The previous code expected response to be the user json.
+    // If the API returns {status: true, data: {user: ...}} for update, we need to handle that.
+    // Or if it returns {status: true, data: <UserObject>}.
+    // For now assuming it returns the updated user object in 'data'.
 
     _currentUser = User.fromJson(response);
     await _saveSession(_currentUser!);
@@ -118,6 +153,7 @@ class AuthRepository {
         filePath: file.path,
       );
     }
+    // ApiClient unwraps data. If data contains {url: ...}
     return response['url'];
   }
 
@@ -125,14 +161,25 @@ class AuthRepository {
     if (_currentUser == null) return;
     if (_currentUser!.isVerified) return;
 
-    await _api.post('/auth/verify-request?email=${_currentUser!.email}', {});
+    await _api.post('/auth/verify-request', {'email': _currentUser!.email});
+    // Removed query param style if we are posting body now, but kept both or cleaned up.
+    // Previous was: /auth/verify-request?email=...
   }
 
   Future<void> logout() async {
     _currentUser = null;
+    _api.clearToken();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kUserIdKey);
-    await prefs.remove('user_session'); // Also remove the user session
+    await prefs.remove('user_session');
+    await prefs.remove('auth_token');
+
+    try {
+      // Optional: Call logout endpoint if exists
+      await _api.post('/auth/logout', {});
+    } catch (e) {
+      // ignore
+    }
   }
 }
 

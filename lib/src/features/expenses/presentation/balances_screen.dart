@@ -19,7 +19,7 @@ class BalancesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final balancesAsync = ref.watch(balancesProvider(groupId));
-    final membersAsync = ref.watch(membersStreamProvider(groupId));
+    final membersAsync = ref.watch(membersFutureProvider(groupId));
 
     return Scaffold(
       body: balancesAsync.when(
@@ -28,10 +28,10 @@ class BalancesScreen extends ConsumerWidget {
             return RefreshIndicator(
               onRefresh: () async {
                 final future1 = ref.refresh(
-                  expensesStreamProvider(groupId).future,
+                  expensesFutureProvider(groupId).future,
                 );
                 final future2 = ref.refresh(
-                  membersStreamProvider(groupId).future,
+                  membersFutureProvider(groupId).future,
                 );
                 await Future.wait([future1, future2]);
               },
@@ -59,10 +59,10 @@ class BalancesScreen extends ConsumerWidget {
                 onRefresh: () async {
                   // Refresh both dependencies
                   final future1 = ref.refresh(
-                    expensesStreamProvider(groupId).future,
+                    expensesFutureProvider(groupId).future,
                   );
                   final future2 = ref.refresh(
-                    membersStreamProvider(groupId).future,
+                    membersFutureProvider(groupId).future,
                   );
                   await Future.wait([future1, future2]);
                 },
@@ -191,8 +191,8 @@ class BalancesScreen extends ConsumerWidget {
 
 final balancesProvider = Provider.family
     .autoDispose<AsyncValue<List<BalanceTransfer>>, int>((ref, groupId) {
-      final expensesAsync = ref.watch(expensesStreamProvider(groupId));
-      final membersAsync = ref.watch(membersStreamProvider(groupId));
+      final expensesAsync = ref.watch(expensesFutureProvider(groupId));
+      final membersAsync = ref.watch(membersFutureProvider(groupId));
 
       if (expensesAsync.isLoading || membersAsync.isLoading) {
         return const AsyncValue.loading();

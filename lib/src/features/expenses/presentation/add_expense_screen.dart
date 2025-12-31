@@ -67,7 +67,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final membersAsync = ref.watch(membersStreamProvider(widget.groupId));
+    final membersAsync = ref.watch(membersFutureProvider(widget.groupId));
 
     return Scaffold(
       appBar: AppBar(title: const Text('New Expense')),

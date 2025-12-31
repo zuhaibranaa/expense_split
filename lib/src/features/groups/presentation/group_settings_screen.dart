@@ -26,7 +26,7 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
     if (user == null) return null;
 
     final members = await ref.read(
-      membersStreamProvider(widget.group.id).future,
+      membersFutureProvider(widget.group.id).future,
     );
     return members.firstWhere(
       (m) => m.userId == user.id,
@@ -47,7 +47,7 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final membersAsync = ref.watch(membersStreamProvider(widget.group.id));
+    final membersAsync = ref.watch(membersFutureProvider(widget.group.id));
 
     return Scaffold(
       body: _isLoading
@@ -303,77 +303,78 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
 
     showDialog(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setState) {
-          bool isLoading = false;
-
-          return AlertDialog(
-            title: const Text('Edit Member Name'),
-            content: TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                prefixIcon: Icon(Icons.person),
+      builder: (dialogContext) {
+        bool isLoading = false;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Edit Member Name'),
+              content: TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Name',
+                  prefixIcon: Icon(Icons.person),
+                ),
+                enabled: !isLoading,
               ),
-              enabled: !isLoading,
-            ),
-            actions: [
-              TextButton(
-                onPressed: isLoading
-                    ? null
-                    : () => Navigator.pop(dialogContext),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: isLoading
-                    ? null
-                    : () async {
-                        if (nameController.text.trim().isEmpty) return;
+              actions: [
+                TextButton(
+                  onPressed: isLoading
+                      ? null
+                      : () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          if (nameController.text.trim().isEmpty) return;
 
-                        setState(() => isLoading = true);
-                        try {
-                          final user = ref.read(authControllerProvider).value;
-                          if (user == null) return;
+                          setState(() => isLoading = true);
+                          try {
+                            final user = ref.read(authControllerProvider).value;
+                            if (user == null) return;
 
-                          await ref
-                              .read(membersRepositoryProvider)
-                              .updateMember(
-                                widget.group.id,
-                                member.id,
-                                user.id,
-                                name: nameController.text.trim(),
+                            await ref
+                                .read(membersRepositoryProvider)
+                                .updateMember(
+                                  widget.group.id,
+                                  member.id,
+                                  user.id,
+                                  name: nameController.text.trim(),
+                                );
+
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+                            }
+                          } catch (e) {
+                            setState(() => isLoading = false);
+                            if (dialogContext.mounted) {
+                              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
                               );
-
-                          if (dialogContext.mounted) {
-                            Navigator.pop(dialogContext);
+                            }
                           }
-                        } catch (e) {
-                          setState(() => isLoading = false);
-                          if (dialogContext.mounted) {
-                            ScaffoldMessenger.of(dialogContext).showSnackBar(
-                              SnackBar(
-                                content: Text('Error: $e'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        }
-                      },
-                child: isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text('Save'),
-              ),
-            ],
-          );
-        },
-      ),
+                        },
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

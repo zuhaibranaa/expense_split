@@ -158,7 +158,7 @@ class ProfileScreen extends ConsumerWidget {
                 onPressed: () =>
                     ref.read(authControllerProvider.notifier).logout(),
                 style: FilledButton.styleFrom(
-                  backgroundColor: Colors.red.withOpacity(0.8),
+                  backgroundColor: Colors.red.withValues(alpha: 0.8),
                 ),
                 child: const Text('Log Out'),
               ),

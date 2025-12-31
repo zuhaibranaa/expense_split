@@ -12,7 +12,7 @@ class StatsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // 1. Fetch All Groups
-    final groupsAsync = ref.watch(groupsListStreamProvider);
+    final groupsAsync = ref.watch(groupsListFutureProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Statistics'), centerTitle: true),
@@ -122,7 +122,7 @@ class _StatsContentState extends ConsumerState<_StatsContent> {
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.cyan.withOpacity(0.2),
+                              color: Colors.cyan.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: const Icon(
