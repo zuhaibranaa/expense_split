@@ -27,69 +27,75 @@ class MembersListView extends ConsumerWidget {
           if (members.isEmpty) {
             return const Center(child: Text('No people in this group yet.'));
           }
-          return ListView.builder(
-            itemCount: members.length,
-            itemBuilder: (context, index) {
-              final member = members[index];
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundImage: member.avatarUrl != null
-                      ? NetworkImage(member.avatarUrl!)
-                      : null,
-                  child: member.avatarUrl == null
-                      ? Text(member.name[0].toUpperCase())
-                      : null,
-                ),
-                title: Text(member.name),
-                subtitle: Row(
-                  children: [
-                    if (member.isAdmin == 1)
-                      Container(
-                        margin: const EdgeInsets.only(right: 8),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.blue.shade300),
-                        ),
-                        child: Text(
-                          'Admin',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade800,
+          return RefreshIndicator(
+            onRefresh: () async {
+              return await ref.refresh(membersStreamProvider(groupId).future);
+            },
+            child: ListView.builder(
+              itemCount: members.length,
+              itemBuilder: (context, index) {
+                final member = members[index];
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundImage: member.avatarUrl != null
+                        ? NetworkImage(member.avatarUrl!)
+                        : null,
+                    child: member.avatarUrl == null
+                        ? Text(member.name[0].toUpperCase())
+                        : null,
+                  ),
+                  title: Text(member.name),
+                  subtitle: Row(
+                    children: [
+                      if (member.isAdmin == 1)
+                        Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.blue.shade300),
+                          ),
+                          child: Text(
+                            'Admin',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue.shade800,
+                            ),
                           ),
                         ),
-                      ),
-                    if (member.userId != null)
-                      const Text(
-                        'Verified User',
-                        style: TextStyle(fontSize: 12, color: Colors.green),
-                      ),
-                  ],
-                ),
-                trailing: member.userId == null
-                    ? TextButton.icon(
-                        icon: const Icon(Icons.link),
-                        label: const Text('Invite'),
-                        onPressed: () => _generateInvite(context, ref, member),
-                      )
-                    : const Icon(Icons.chevron_right),
-                onTap: () {
-                  if (member.userId != null) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => MemberProfileScreen(member: member),
-                      ),
-                    );
-                  }
-                },
-              );
-            },
+                      if (member.userId != null)
+                        const Text(
+                          'Verified User',
+                          style: TextStyle(fontSize: 12, color: Colors.green),
+                        ),
+                    ],
+                  ),
+                  trailing: member.userId == null
+                      ? TextButton.icon(
+                          icon: const Icon(Icons.link),
+                          label: const Text('Invite'),
+                          onPressed: () =>
+                              _generateInvite(context, ref, member),
+                        )
+                      : const Icon(Icons.chevron_right),
+                  onTap: () {
+                    if (member.userId != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => MemberProfileScreen(member: member),
+                        ),
+                      );
+                    }
+                  },
+                );
+              },
+            ),
           );
         },
         error: (err, st) => Center(child: Text('Error: $err')),

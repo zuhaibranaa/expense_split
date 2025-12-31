@@ -66,83 +66,92 @@ class ExpensesListScreen extends ConsumerWidget {
           if (items.isEmpty) {
             return const Center(child: Text('No expenses yet. Add one!'));
           }
-          return ListView.builder(
-            itemCount: items.length,
-            itemBuilder: (context, index) {
-              final item = items[index];
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.tertiaryContainer,
-                  child: const Icon(Icons.attach_money),
-                ),
-                title: Text(item.description),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Paid by ${item.payer?.name ?? 'Unknown'}'),
-                    // Show small avatars for splits
-                    if (item.splits.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Text(
-                            "Split: ",
-                            style: TextStyle(fontSize: 10, color: Colors.grey),
-                          ),
-                          ...item.splits
-                              .map((split) {
-                                // Find member name/initials
-                                final matches = membersAsync.value?.where(
-                                  (m) => m.id == split.memberId,
-                                );
-                                final member =
-                                    (matches != null && matches.isNotEmpty)
-                                    ? matches.first
-                                    : null;
-                                if (member == null) return const SizedBox();
-
-                                return Padding(
-                                  padding: const EdgeInsets.only(right: 2.0),
-                                  child: Tooltip(
-                                    message: member.name,
-                                    child: CircleAvatar(
-                                      radius: 8,
-                                      backgroundImage: member.avatarUrl != null
-                                          ? NetworkImage(member.avatarUrl!)
-                                          : null,
-                                      backgroundColor: Colors.grey.shade300,
-                                      child: member.avatarUrl == null
-                                          ? Text(
-                                              member.name[0],
-                                              style: const TextStyle(
-                                                fontSize: 8,
-                                              ),
-                                            )
-                                          : null,
-                                    ),
-                                  ),
-                                );
-                              })
-                              .take(5), // Limit to 5
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-                trailing: Text(
-                  item.amount.toStringAsFixed(2),
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                onTap: () => _showExpenseDetails(
-                  context,
-                  ref,
-                  item,
-                  membersAsync.value ?? [],
-                ),
-              );
+          return RefreshIndicator(
+            onRefresh: () async {
+              return await ref.refresh(expensesStreamProvider(groupId).future);
             },
+            child: ListView.builder(
+              itemCount: items.length,
+              itemBuilder: (context, index) {
+                final item = items[index];
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.tertiaryContainer,
+                    child: const Icon(Icons.attach_money),
+                  ),
+                  title: Text(item.description),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Paid by ${item.payer?.name ?? 'Unknown'}'),
+                      // Show small avatars for splits
+                      if (item.splits.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Text(
+                              "Split: ",
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            ...item.splits
+                                .map((split) {
+                                  // Find member name/initials
+                                  final matches = membersAsync.value?.where(
+                                    (m) => m.id == split.memberId,
+                                  );
+                                  final member =
+                                      (matches != null && matches.isNotEmpty)
+                                      ? matches.first
+                                      : null;
+                                  if (member == null) return const SizedBox();
+
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 2.0),
+                                    child: Tooltip(
+                                      message: member.name,
+                                      child: CircleAvatar(
+                                        radius: 8,
+                                        backgroundImage:
+                                            member.avatarUrl != null
+                                            ? NetworkImage(member.avatarUrl!)
+                                            : null,
+                                        backgroundColor: Colors.grey.shade300,
+                                        child: member.avatarUrl == null
+                                            ? Text(
+                                                member.name[0],
+                                                style: const TextStyle(
+                                                  fontSize: 8,
+                                                ),
+                                              )
+                                            : null,
+                                      ),
+                                    ),
+                                  );
+                                })
+                                .take(5), // Limit to 5
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                  trailing: Text(
+                    item.amount.toStringAsFixed(2),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  onTap: () => _showExpenseDetails(
+                    context,
+                    ref,
+                    item,
+                    membersAsync.value ?? [],
+                  ),
+                );
+              },
+            ),
           );
         },
         error: (err, st) => Center(child: Text('Error: $err')),

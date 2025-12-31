@@ -108,127 +108,144 @@ class GlobalSettlementsScreen extends ConsumerWidget {
       body: settlementsAsync.when(
         data: (items) {
           if (items.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+            return RefreshIndicator(
+              onRefresh: () async {
+                return await ref.refresh(globalSettlementsProvider.future);
+              },
+              child: Stack(
                 children: [
-                  Icon(
-                    Icons.check_circle_outline,
-                    size: 64,
-                    color: Colors.green,
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'You are all settled up!',
-                    style: TextStyle(fontSize: 18),
+                  ListView(),
+                  const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          size: 64,
+                          color: Colors.green,
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'You are all settled up!',
+                          style: TextStyle(fontSize: 18),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             );
           }
 
-          return ListView.builder(
-            itemCount: items.length,
-            padding: const EdgeInsets.all(16),
-            itemBuilder: (context, index) {
-              final item = items[index];
-              final isOwesMe = item.amount > 0;
-              final amount = item.amount.abs();
+          return RefreshIndicator(
+            onRefresh: () async {
+              return await ref.refresh(globalSettlementsProvider.future);
+            },
+            child: ListView.builder(
+              itemCount: items.length,
+              padding: const EdgeInsets.all(16),
+              itemBuilder: (context, index) {
+                final item = items[index];
+                final isOwesMe = item.amount > 0;
+                final amount = item.amount.abs();
 
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Group Name Badge
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Container(
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade100,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.blue.shade300),
-                            ),
-                            child: Text(
-                              item.groupName,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue.shade800,
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Group Name Badge
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              margin: const EdgeInsets.only(right: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade100,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.blue.shade300),
+                              ),
+                              child: Text(
+                                item.groupName,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue.shade800,
+                                ),
                               ),
                             ),
-                          ),
-                          if (!isOwesMe) // Only show settle button if I owe
-                            OutlinedButton.icon(
-                              onPressed: () async {
-                                await Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (context) => SettleUpScreen(
-                                      groupId: item.groupId,
-                                      payer: item.me,
-                                      receiver: item.other,
-                                      amount: amount,
-                                      groupCurrency: item.groupCurrency,
+                            if (!isOwesMe) // Only show settle button if I owe
+                              OutlinedButton.icon(
+                                onPressed: () async {
+                                  await Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) => SettleUpScreen(
+                                        groupId: item.groupId,
+                                        payer: item.me,
+                                        receiver: item.other,
+                                        amount: amount,
+                                        groupCurrency: item.groupCurrency,
+                                      ),
+                                    ),
+                                  );
+                                  // Refresh list
+                                  ref.refresh(globalSettlementsProvider);
+                                },
+                                icon: const Icon(Icons.payment, size: 16),
+                                label: const Text('Pay'),
+                                style: OutlinedButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Debt Details
+                        Row(
+                          children: [
+                            Icon(
+                              isOwesMe ? Icons.arrow_back : Icons.arrow_forward,
+                              color: isOwesMe ? Colors.green : Colors.red,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isOwesMe
+                                        ? '${item.other.name} owes you'
+                                        : 'You owe ${item.other.name}',
+                                    style: const TextStyle(fontSize: 16),
+                                  ),
+                                  Text(
+                                    '${item.groupCurrency} ${amount.toStringAsFixed(2)}',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: isOwesMe
+                                          ? Colors.green
+                                          : Colors.red,
                                     ),
                                   ),
-                                );
-                                // Refresh list
-                                ref.refresh(globalSettlementsProvider);
-                              },
-                              icon: const Icon(Icons.payment, size: 16),
-                              label: const Text('Pay'),
-                              style: OutlinedButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
+                                ],
                               ),
                             ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Debt Details
-                      Row(
-                        children: [
-                          Icon(
-                            isOwesMe ? Icons.arrow_back : Icons.arrow_forward,
-                            color: isOwesMe ? Colors.green : Colors.red,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  isOwesMe
-                                      ? '${item.other.name} owes you'
-                                      : 'You owe ${item.other.name}',
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                                Text(
-                                  '${item.groupCurrency} ${amount.toStringAsFixed(2)}',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: isOwesMe ? Colors.green : Colors.red,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           );
         },
         error: (e, s) => Center(child: Text('Error: $e')),
