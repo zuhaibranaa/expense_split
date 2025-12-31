@@ -62,12 +62,4 @@ class PlatformInfo {
         return 'Fuchsia';
     }
   }
-
-  static String getDefaultApiBaseUrl() {
-    return 'https://expense-split-yx4l.onrender.com';
-  }
-
-  static String getDefaultWebSocketBaseUrl() {
-    return 'ws://expense-split-yx4l.onrender.com';
-  }
 }

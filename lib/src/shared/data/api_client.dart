@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../config/environment.dart';
 import '../utils/platform_info.dart';
 import '../utils/global_error_handler.dart';
 
@@ -11,7 +12,7 @@ class ApiClient {
   late final String baseUrl;
 
   ApiClient() {
-    var url = PlatformInfo.getDefaultApiBaseUrl();
+    var url = Environment.apiBaseUrl;
     if (url.endsWith('/')) {
       url = url.substring(0, url.length - 1);
     }
