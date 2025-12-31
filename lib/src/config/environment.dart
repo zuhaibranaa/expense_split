@@ -1,13 +1,14 @@
 import '../shared/utils/platform_info.dart';
 
 class Environment {
-  static const String _prodApiBaseUrl = 'https://stagging-api.equisplit.click';
+  static const String _prodApiBaseUrl =
+      'https://stagging-api.equisplit.click/api/';
   static const String _prodWsBaseUrl = 'ws://stagging-api.equisplit.click';
 
-  static const String _devApiBaseUrl = 'http://127.0.0.1:8000';
+  static const String _devApiBaseUrl = 'http://127.0.0.1:8000/api/';
   static const String _devWsBaseUrl = 'ws://127.0.0.1:8000';
 
-  static const String _androidDevApiBaseUrl = 'http://10.0.2.2:8000';
+  static const String _androidDevApiBaseUrl = 'http://10.0.2.2:8000/api/';
   static const String _androidDevWsBaseUrl = 'ws://10.0.2.2:8000';
 
   static bool get isProduction => const bool.fromEnvironment('dart.vm.product');

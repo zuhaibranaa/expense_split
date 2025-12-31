@@ -31,7 +31,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(authControllerProvider).value;
       if (user != null) {
-        ref.read(webSocketServiceProvider).connect(user.id);
+        // ref.read(webSocketServiceProvider).connect(user.id);
       }
     });
   }
