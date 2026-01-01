@@ -51,8 +51,6 @@ class ApiClient {
       Uri.parse('$baseUrl$endpoint'),
       headers: _getHeaders(),
     );
-    debugPrint('$baseUrl$endpoint');
-    debugPrint(response.body.toString());
     return _handleResponse(response);
   }
 
@@ -124,7 +122,6 @@ class ApiClient {
 
     final response = await request.send();
     final responseBody = await response.stream.bytesToString();
-
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return jsonDecode(responseBody);
     } else {

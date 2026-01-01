@@ -141,20 +141,37 @@ class AuthRepository {
     if (kIsWeb) {
       final bytes = await file.readAsBytes();
       response = await _api.postMultipart(
-        '/upload/image',
+        '/upload',
         'file',
         fileBytes: bytes,
         filename: file.name,
       );
     } else {
       response = await _api.postMultipart(
-        '/upload/image',
+        '/upload',
         'file',
         filePath: file.path,
       );
     }
-    // ApiClient unwraps data. If data contains {url: ...}
-    return response['url'];
+    debugPrint('Upload Response: $response');
+
+    if (response is Map<String, dynamic>) {
+      // Check for status
+      final status = response['status'];
+      if (status == true || status == 'success') {
+        final data = response['data'];
+        if (data is Map<String, dynamic> && data.containsKey('url')) {
+          return data['url'];
+        }
+      }
+
+      // If failure or missing data, look for message
+      if (response.containsKey('message')) {
+        throw Exception(response['message']);
+      }
+    }
+
+    throw Exception('Failed to upload avatar: Unexpected response format');
   }
 
   Future<void> requestVerification() async {
@@ -236,7 +253,7 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
     String? iban,
   }) async {
     final repo = ref.read(authRepositoryProvider);
-    state = const AsyncValue.loading();
+    // Don't set loading state to prevent AuthGate from rebuilding entire app
     state = await AsyncValue.guard(() async {
       await repo.updateProfile(
         name: name,
@@ -258,7 +275,6 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
 
   Future<void> uploadAvatar(XFile file) async {
     final repo = ref.read(authRepositoryProvider);
-    state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       final url = await repo.uploadAvatar(file);
       await repo.updateProfile(avatarUrl: url); // Update profile with new URL
