@@ -62,6 +62,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     for (var c in _splitControllers.values) {
       c.dispose();
     }
+    for (var f in _splitFocusNodes.values) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -467,12 +470,29 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   }
 
   Widget _buildExactSplitView(List<Member> members) {
-    // Ensure controllers exist and have listeners
+    // Ensure controllers and focus nodes exist and have listeners
     for (var m in members) {
       if (!_splitControllers.containsKey(m.id)) {
         final c = TextEditingController(text: '0.00');
         c.addListener(() => _onSplitAmountChanged(m.id, members));
         _splitControllers[m.id] = c;
+      }
+
+      if (!_splitFocusNodes.containsKey(m.id)) {
+        final fn = FocusNode();
+        fn.addListener(() {
+          if (fn.hasFocus) {
+            // Store previous value and clear on focus
+            _tempSplitValues[m.id] = _splitControllers[m.id]?.text ?? '0.00';
+            _splitControllers[m.id]?.clear();
+          } else {
+            // On blur, if empty, restore previous value
+            if (_splitControllers[m.id]?.text.isEmpty ?? true) {
+              _splitControllers[m.id]?.text = _tempSplitValues[m.id] ?? '0.00';
+            }
+          }
+        });
+        _splitFocusNodes[m.id] = fn;
       }
     }
 
@@ -492,6 +512,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 width: 120,
                 child: TextField(
                   controller: _splitControllers[member.id],
+                  focusNode: _splitFocusNodes[member.id],
                   decoration: InputDecoration(
                     prefixText: '${widget.groupCurrency} ',
                     isDense: true,
@@ -509,6 +530,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       }).toList(),
     );
   }
+
+  final Map<int, FocusNode> _splitFocusNodes = {};
+  final Map<int, String> _tempSplitValues = {};
 
   void _submit(List<Member> members) async {
     final desc = _descriptionController.text.trim();
