@@ -315,7 +315,7 @@ final allGroupsExpensesProvider = FutureProvider.family<List<Expense>, String>((
 
   // Parallel fetch could be better but sticking to simple loop for now
   for (var id in groupIds) {
-    final expenses = await repo.getExpensesList(
+    final expenses = await repo.getExpenses(
       id,
     ); // Need to expose getExpensesListFuture
     allExpenses.addAll(expenses);

@@ -51,7 +51,7 @@ final globalSettlementsProvider =
 
           if (me.id == -1) return; // Not a member of this group
 
-          final expenses = await expensesRepo.getExpensesList(group.id);
+          final expenses = await expensesRepo.getExpenses(group.id);
           final transfers = BalanceCalculator.calculateBalances(
             expenses,
             members,

@@ -38,11 +38,6 @@ class ExpensesRepository {
     return json.map((e) => Expense.fromJson(e)).toList();
   }
 
-  Future<List<Expense>> getExpensesList(int groupId) async {
-    final jsonList = await _api.get('/groups/$groupId/expenses/');
-    return (jsonList as List).map((e) => Expense.fromJson(e)).toList();
-  }
-
   Future<void> updateExpense({
     required int groupId,
     required int expenseId,
