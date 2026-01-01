@@ -74,7 +74,7 @@ class GroupsListScreen extends ConsumerWidget {
                             width: 50,
                             height: 50,
                             decoration: BoxDecoration(
-                              color: Color(0xFF0A5360),
+                              color: Colors.cyan.shade900,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             alignment: Alignment.center,
