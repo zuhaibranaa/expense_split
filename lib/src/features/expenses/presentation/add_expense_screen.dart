@@ -574,9 +574,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     try {
       if (widget.expense == null) {
         await ref
-            .read(expensesRepositoryProvider)
+            .read(expensesFutureProvider(widget.groupId).notifier)
             .createExpense(
-              groupId: widget.groupId,
               description: desc,
               amount: totalAmount,
               payerId: _selectedPayerId!,
@@ -588,18 +587,15 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         final user = ref.read(authControllerProvider).value;
         if (user != null) {
           await ref
-              .read(expensesRepositoryProvider)
+              .read(expensesFutureProvider(widget.groupId).notifier)
               .updateExpense(
-                groupId: widget.groupId,
                 expenseId: widget.expense!.id,
                 userId: user.id,
                 description: desc,
                 amount: totalAmount,
                 payerId: _selectedPayerId!,
                 category: _selectedCategory,
-                date: widget
-                    .expense!
-                    .date, // Keep original date or update? user didn't ask to change date.
+                date: widget.expense!.date,
                 splits: splits,
               );
         }

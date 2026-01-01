@@ -78,9 +78,96 @@ final expensesRepositoryProvider = Provider<ExpensesRepository>((ref) {
   return ExpensesRepository(api);
 });
 
-// Replaces watchGroupExpenses
-final expensesFutureProvider = FutureProvider.autoDispose
-    .family<List<Expense>, int>((ref, groupId) async {
-      final repo = ref.watch(expensesRepositoryProvider);
-      return await repo.getExpenses(groupId);
+final expensesFutureProvider = AsyncNotifierProvider.autoDispose
+    .family<ExpensesNotifier, List<Expense>, int>(ExpensesNotifier.new);
+
+class ExpensesNotifier
+    extends AutoDisposeFamilyAsyncNotifier<List<Expense>, int> {
+  @override
+  Future<List<Expense>> build(int arg) async {
+    final repo = ref.read(expensesRepositoryProvider);
+    return repo.getExpenses(arg);
+  }
+
+  Future<void> createExpense({
+    required String description,
+    required double amount,
+    required int payerId,
+    required String category,
+    required DateTime date,
+    required Map<int, double> splits,
+    bool isSettlement = false,
+  }) async {
+    final repo = ref.read(expensesRepositoryProvider);
+
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      await repo.createExpense(
+        groupId: arg,
+        description: description,
+        amount: amount,
+        payerId: payerId,
+        category: category,
+        date: date,
+        splits: splits,
+        isSettlement: isSettlement,
+      );
+      return repo.getExpenses(arg);
     });
+  }
+
+  Future<void> updateExpense({
+    required int expenseId,
+    required int userId,
+    required String description,
+    required double amount,
+    required int payerId,
+    required String category,
+    required DateTime date,
+    required Map<int, double> splits,
+  }) async {
+    final repo = ref.read(expensesRepositoryProvider);
+    // Optimistic Update (Complex due to splits, but we can try basic fields if needed)
+    // For now, let's just use refetch for safety as backend calculation is important?
+    // Actually, local update is fine if we reconstruct Expense object.
+
+    try {
+      await repo.updateExpense(
+        groupId: arg,
+        expenseId: expenseId,
+        userId: userId,
+        description: description,
+        amount: amount,
+        payerId: payerId,
+        category: category,
+        date: date,
+        splits: splits,
+      );
+      // Refetch to get consistent state
+      state = await AsyncValue.guard(() => repo.getExpenses(arg));
+    } catch (e) {
+      // state = previousState; // If we didn't optimistic update, no need to revert, but we are reloading
+      state = AsyncValue.error(e, StackTrace.current);
+      rethrow;
+    }
+  }
+
+  Future<void> deleteExpense(int expenseId, int userId) async {
+    final repo = ref.read(expensesRepositoryProvider);
+    final previousState = state;
+
+    // Optimistic Update
+    if (previousState.value != null) {
+      state = AsyncValue.data(
+        previousState.value!.where((e) => e.id != expenseId).toList(),
+      );
+    }
+
+    try {
+      await repo.deleteExpense(arg, expenseId, userId);
+    } catch (e) {
+      state = previousState;
+      rethrow;
+    }
+  }
+}

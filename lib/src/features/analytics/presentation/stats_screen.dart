@@ -12,7 +12,7 @@ class StatsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // 1. Fetch All Groups
-    final groupsAsync = ref.watch(groupsListFutureProvider);
+    final groupsAsync = ref.watch(groupsListProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Statistics'), centerTitle: true),

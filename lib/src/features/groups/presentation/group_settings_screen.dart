@@ -276,8 +276,8 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
           if (user == null) return;
 
           await ref
-              .read(groupsRepositoryProvider)
-              .updateGroup(widget.group.id, user.id, currency: currency.code);
+              .read(groupsListProvider.notifier)
+              .updateGroup(widget.group.id, currency: currency.code);
 
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -336,9 +336,12 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
                             if (user == null) return;
 
                             await ref
-                                .read(membersRepositoryProvider)
+                                .read(
+                                  membersFutureProvider(
+                                    widget.group.id,
+                                  ).notifier,
+                                )
                                 .updateMember(
-                                  widget.group.id,
                                   member.id,
                                   user.id,
                                   name: nameController.text.trim(),
@@ -401,8 +404,8 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
                 if (user == null) return;
 
                 await ref
-                    .read(membersRepositoryProvider)
-                    .removeMember(widget.group.id, member.id, user.id);
+                    .read(membersFutureProvider(widget.group.id).notifier)
+                    .removeMember(member.id, user.id);
 
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(

@@ -207,12 +207,14 @@ class MembersListView extends ConsumerWidget {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               if (nameController.text.isNotEmpty) {
-                ref
-                    .read(membersRepositoryProvider)
-                    .addMember(groupId, nameController.text);
-                Navigator.pop(context);
+                await ref
+                    .read(membersFutureProvider(groupId).notifier)
+                    .addMember(nameController.text.trim());
+                if (context.mounted) {
+                  Navigator.pop(context);
+                }
               }
             },
             child: const Text('Add'),

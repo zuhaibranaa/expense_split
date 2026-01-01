@@ -75,18 +75,90 @@ final groupsRepositoryProvider = Provider<GroupsRepository>((ref) {
   return GroupsRepository(api);
 });
 
-final groupsListFutureProvider = FutureProvider.autoDispose<List<Group>>((
-  ref,
-) async {
-  final repo = ref.watch(groupsRepositoryProvider);
-  final user = ref.watch(authControllerProvider).value;
+final groupsListProvider =
+    AsyncNotifierProvider.autoDispose<GroupsNotifier, List<Group>>(
+      GroupsNotifier.new,
+    );
 
-  if (user == null) {
-    return [];
+class GroupsNotifier extends AutoDisposeAsyncNotifier<List<Group>> {
+  @override
+  Future<List<Group>> build() async {
+    final repo = ref.watch(groupsRepositoryProvider);
+    final user = ref.watch(authControllerProvider).value;
+    if (user == null) return [];
+    return repo.getGroups(user.id);
   }
 
-  return await repo.getGroups(user.id);
-});
+  Future<void> addGroup(String name, String currency) async {
+    final user = ref.read(authControllerProvider).value;
+    if (user == null) return;
+    final repo = ref.read(groupsRepositoryProvider);
+
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      await repo.createGroup(name, currency, user.id);
+      return repo.getGroups(user.id); // Refetch to get ID and server fields
+    });
+  }
+
+  Future<void> updateGroup(
+    int groupId, {
+    String? name,
+    String? currency,
+  }) async {
+    final user = ref.read(authControllerProvider).value;
+    if (user == null) return;
+    final repo = ref.read(groupsRepositoryProvider);
+
+    // Optimistic Update
+    final previousState = state;
+    if (previousState.value != null) {
+      state = AsyncValue.data(
+        previousState.value!.map((g) {
+          if (g.id == groupId) {
+            return Group(
+              id: g.id,
+              name: name ?? g.name,
+              currency: currency ?? g.currency,
+              createdAt: g.createdAt,
+              // creatorUserId: g.creatorUserId, // Removed as it's not in model or needed for optimistic
+            );
+          }
+          return g;
+        }).toList(),
+      );
+    }
+
+    try {
+      await repo.updateGroup(groupId, user.id, name: name, currency: currency);
+    } catch (e) {
+      // Revert on failure
+      state = previousState;
+      rethrow;
+    }
+  }
+
+  Future<void> deleteGroup(int groupId) async {
+    final user = ref.read(authControllerProvider).value;
+    if (user == null) return;
+    final repo = ref.read(groupsRepositoryProvider);
+
+    // Optimistic Update
+    final previousState = state;
+    if (previousState.value != null) {
+      state = AsyncValue.data(
+        previousState.value!.where((g) => g.id != groupId).toList(),
+      );
+    }
+
+    try {
+      await repo.deleteGroup(groupId, user.id);
+    } catch (e) {
+      state = previousState;
+      rethrow;
+    }
+  }
+}
 
 final groupMembersProvider = FutureProvider.family<List<Member>, int>((
   ref,

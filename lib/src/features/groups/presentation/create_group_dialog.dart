@@ -41,8 +41,8 @@ class _CreateGroupDialogState extends ConsumerState<CreateGroupDialog> {
 
     try {
       await ref
-          .read(groupsRepositoryProvider)
-          .createGroup(_nameController.text.trim(), _selectedCurrency, user.id);
+          .read(groupsListProvider.notifier)
+          .addGroup(_nameController.text.trim(), _selectedCurrency);
       if (mounted) {
         Navigator.pop(context);
       }

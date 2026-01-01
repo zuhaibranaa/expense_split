@@ -263,8 +263,8 @@ class ExpensesListScreen extends ConsumerWidget {
                   Navigator.pop(dialogContext);
                   try {
                     await ref
-                        .read(expensesRepositoryProvider)
-                        .deleteExpense(groupId, expense.id, user!.id);
+                        .read(expensesFutureProvider(groupId).notifier)
+                        .deleteExpense(expense.id, user!.id);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Expense deleted')),
