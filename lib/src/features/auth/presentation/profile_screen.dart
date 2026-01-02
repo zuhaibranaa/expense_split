@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:currency_picker/currency_picker.dart';
 import '../data/auth_repository.dart';
+import 'package:http/http.dart' as http;
 
 import 'package:image_picker/image_picker.dart';
 
@@ -200,20 +201,115 @@ class ProfileScreen extends ConsumerWidget {
               title: const Text('Enter URL'),
               onTap: () {
                 Navigator.pop(context);
-                _editField(
-                  context,
-                  ref,
-                  "Avatar URL",
-                  currentUrl,
-                  (val) => ref
-                      .read(authControllerProvider.notifier)
-                      .updateProfile(avatarUrl: val),
-                );
+                _showAvatarUrlDialog(context, ref);
               },
             ),
           ],
         ),
       ),
+    );
+  }
+
+  void _showAvatarUrlDialog(BuildContext context, WidgetRef ref) {
+    final controller = TextEditingController();
+    // We use a StatefulBuilder to handle the loading/error state inside the dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        bool isLoading = false;
+        String? errorText;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text("Enter Avatar URL"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: controller,
+                    decoration: InputDecoration(
+                      labelText: "Image URL",
+                      hintText: "",
+                      errorText: errorText,
+                      border: const OutlineInputBorder(),
+                    ),
+                    autofocus: true,
+                    enabled: !isLoading,
+                  ),
+                  if (isLoading)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 16.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isLoading ? null : () => Navigator.pop(context),
+                  child: const Text("Cancel"),
+                ),
+                TextButton(
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          final url = controller.text.trim();
+                          if (url.isEmpty) {
+                            setState(() => errorText = "URL cannot be empty");
+                            return;
+                          }
+
+                          final uri = Uri.tryParse(url);
+                          if (uri == null || !uri.hasAbsolutePath) {
+                            setState(() => errorText = "Invalid URL format");
+                            return;
+                          }
+
+                          setState(() {
+                            isLoading = true;
+                            errorText = null;
+                          });
+
+                          try {
+                            final response = await http.head(uri);
+                            if (response.statusCode == 200) {
+                              final contentType =
+                                  response.headers['content-type'];
+                              if (contentType != null &&
+                                  contentType.startsWith('image/')) {
+                                // Valid image
+                                ref
+                                    .read(authControllerProvider.notifier)
+                                    .updateProfile(avatarUrl: url);
+                                if (context.mounted) Navigator.pop(context);
+                              } else {
+                                setState(() {
+                                  errorText = "URL does not point to an image";
+                                  isLoading = false;
+                                });
+                              }
+                            } else {
+                              setState(() {
+                                errorText =
+                                    "Could not fetch resource (Status: ${response.statusCode})";
+                                isLoading = false;
+                              });
+                            }
+                          } catch (e) {
+                            setState(() {
+                              errorText = "Connection error: $e";
+                              isLoading = false;
+                            });
+                          }
+                        },
+                  child: const Text("Save"),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
