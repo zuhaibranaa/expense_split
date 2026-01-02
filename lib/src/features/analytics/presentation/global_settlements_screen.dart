@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:expense_split/src/features/groups/data/groups_repository.dart';
-import 'package:expense_split/src/features/expenses/data/expenses_repository.dart';
-import 'package:expense_split/src/features/people/data/members_repository.dart';
-import 'package:expense_split/src/features/expenses/domain/balance_calculator.dart';
-import 'package:expense_split/src/features/auth/data/auth_repository.dart';
-import 'package:expense_split/src/features/expenses/presentation/settle_up_screen.dart';
-import 'package:expense_split/src/features/people/domain/member_model.dart';
+import 'package:equisplit/src/features/groups/data/groups_repository.dart';
+import 'package:equisplit/src/features/expenses/data/expenses_repository.dart';
+import 'package:equisplit/src/features/people/data/members_repository.dart';
+import 'package:equisplit/src/features/expenses/domain/balance_calculator.dart';
+import 'package:equisplit/src/features/auth/data/auth_repository.dart';
+import 'package:equisplit/src/features/expenses/presentation/settle_up_screen.dart';
+import 'package:equisplit/src/features/people/domain/member_model.dart';
 
 class GlobalSettlementItem {
   final int groupId;

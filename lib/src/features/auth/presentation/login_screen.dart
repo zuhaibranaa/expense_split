@@ -134,7 +134,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               if (_step == 0) ...[
                 Text(
-                  'Welcome to Expense Split',
+                  'Welcome to Equisplit',
                   style: Theme.of(context).textTheme.headlineSmall,
                   textAlign: TextAlign.center,
                 ),

@@ -4,5 +4,5 @@ import 'src/app.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const ProviderScope(child: SettleUpApp()));
+  runApp(const ProviderScope(child: EquisplitApp()));
 }

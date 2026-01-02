@@ -1,4 +1,4 @@
-package com.expense_split.app
+package com.equisplit.appit.app
 
 import io.flutter.embedding.android.FlutterActivity
 
