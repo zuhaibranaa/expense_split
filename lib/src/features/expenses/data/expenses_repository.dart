@@ -53,7 +53,7 @@ class ExpensesRepository {
         .map((e) => {'member_id': e.key, 'amount': e.value})
         .toList();
 
-    await _api.put('/groups/$groupId/expenses/$expenseId?user_id=$userId', {
+    await _api.put('/expenses/$expenseId?user_id=$userId', {
       'description': description,
       'amount': amount,
       'payer_id': payerId,
