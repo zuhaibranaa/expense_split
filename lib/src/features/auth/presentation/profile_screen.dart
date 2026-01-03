@@ -19,151 +19,157 @@ class ProfileScreen extends ConsumerWidget {
         data: (user) {
           if (user == null) return const Center(child: Text('Not logged in'));
 
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Center(
-                child: GestureDetector(
-                  onTap: () => _showAvatarOptions(context, ref, user.avatarUrl),
-                  child: CircleAvatar(
-                    radius: 50,
-                    backgroundImage: user.avatarUrl != null
-                        ? NetworkImage(user.avatarUrl!)
-                        : null,
-                    // Add an edit icon overlay if you want, but simple tap is fine for now
-                    child: user.avatarUrl == null
-                        ? Text(
-                            user.name[0],
-                            style: const TextStyle(fontSize: 32),
-                          )
-                        : null,
+          return RefreshIndicator(
+            onRefresh: () async {
+              await ref.read(authControllerProvider.notifier).reloadUser();
+            },
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Center(
+                  child: GestureDetector(
+                    onTap: () =>
+                        _showAvatarOptions(context, ref, user.avatarUrl),
+                    child: CircleAvatar(
+                      radius: 50,
+                      backgroundImage: user.avatarUrl != null
+                          ? NetworkImage(user.avatarUrl!)
+                          : null,
+                      // Add an edit icon overlay if you want, but simple tap is fine for now
+                      child: user.avatarUrl == null
+                          ? Text(
+                              user.name[0],
+                              style: const TextStyle(fontSize: 32),
+                            )
+                          : null,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: Text(
-                  "Tap avatar to edit",
-                  style: Theme.of(context).textTheme.bodySmall,
+                const SizedBox(height: 8),
+                Center(
+                  child: Text(
+                    "Tap avatar to edit",
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ),
-              ),
 
-              const SizedBox(height: 24),
-              _buildSectionHeader("Personal Info"),
+                const SizedBox(height: 24),
+                _buildSectionHeader("Personal Info"),
 
-              ListTile(
-                leading: const Icon(Icons.person),
-                title: const Text("Name"),
-                subtitle: Text(user.name),
-                trailing: const Icon(Icons.edit, size: 16),
-                onTap: () => _editField(
-                  context,
-                  ref,
-                  "Name",
-                  user.name,
-                  (val) => ref
-                      .read(authControllerProvider.notifier)
-                      .updateProfile(name: val),
+                ListTile(
+                  leading: const Icon(Icons.person),
+                  title: const Text("Name"),
+                  subtitle: Text(user.name),
+                  trailing: const Icon(Icons.edit, size: 16),
+                  onTap: () => _editField(
+                    context,
+                    ref,
+                    "Name",
+                    user.name,
+                    (val) => ref
+                        .read(authControllerProvider.notifier)
+                        .updateProfile(name: val),
+                  ),
                 ),
-              ),
 
-              ListTile(
-                leading: const Icon(Icons.email),
-                title: const Text("Email"),
-                subtitle: Text(user.email),
-                trailing: user.isVerified
-                    ? const Icon(Icons.check_circle, color: Colors.green)
-                    : TextButton(
-                        onPressed: () async {
-                          await ref
-                              .read(authControllerProvider.notifier)
-                              .requestVerification();
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text("Verification email sent!"),
-                              ),
-                            );
-                          }
-                        },
-                        child: const Text("Verify"),
+                ListTile(
+                  leading: const Icon(Icons.email),
+                  title: const Text("Email"),
+                  subtitle: Text(user.email),
+                  trailing: user.isVerified
+                      ? const Icon(Icons.check_circle, color: Colors.green)
+                      : TextButton(
+                          onPressed: () async {
+                            await ref
+                                .read(authControllerProvider.notifier)
+                                .requestVerification();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text("Verification email sent!"),
+                                ),
+                              );
+                            }
+                          },
+                          child: const Text("Verify"),
+                        ),
+                ),
+
+                ListTile(
+                  leading: const Icon(Icons.phone),
+                  title: const Text("Phone"),
+                  subtitle: Text(user.phone ?? "Not set"),
+                  trailing: const Icon(Icons.edit, size: 16),
+                  onTap: () => _editField(
+                    context,
+                    ref,
+                    "Phone",
+                    user.phone,
+                    (val) => ref
+                        .read(authControllerProvider.notifier)
+                        .updateProfile(phone: val),
+                  ),
+                ),
+
+                ListTile(
+                  leading: const Icon(Icons.account_balance),
+                  title: const Text("IBAN"),
+                  subtitle: Text(user.iban ?? "Not set"),
+                  trailing: const Icon(Icons.edit, size: 16),
+                  onTap: () => _editField(
+                    context,
+                    ref,
+                    "IBAN",
+                    user.iban,
+                    (val) => ref
+                        .read(authControllerProvider.notifier)
+                        .updateProfile(iban: val),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+                _buildSectionHeader("Settings"),
+
+                ListTile(
+                  leading: const Icon(Icons.attach_money),
+                  title: const Text('Default Currency'),
+                  subtitle: Text(user.defaultCurrency),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    showCurrencyPicker(
+                      context: context,
+                      showFlag: true,
+                      showCurrencyName: true,
+                      showCurrencyCode: true,
+                      onSelect: (Currency currency) {
+                        ref
+                            .read(authControllerProvider.notifier)
+                            .updateProfile(currency: currency.code);
+                      },
+                      theme: CurrencyPickerThemeData(
+                        backgroundColor: Theme.of(context).cardColor,
+                        titleTextStyle: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                        subtitleTextStyle: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
                       ),
-              ),
-
-              ListTile(
-                leading: const Icon(Icons.phone),
-                title: const Text("Phone"),
-                subtitle: Text(user.phone ?? "Not set"),
-                trailing: const Icon(Icons.edit, size: 16),
-                onTap: () => _editField(
-                  context,
-                  ref,
-                  "Phone",
-                  user.phone,
-                  (val) => ref
-                      .read(authControllerProvider.notifier)
-                      .updateProfile(phone: val),
+                    );
+                  },
                 ),
-              ),
 
-              ListTile(
-                leading: const Icon(Icons.account_balance),
-                title: const Text("IBAN"),
-                subtitle: Text(user.iban ?? "Not set"),
-                trailing: const Icon(Icons.edit, size: 16),
-                onTap: () => _editField(
-                  context,
-                  ref,
-                  "IBAN",
-                  user.iban,
-                  (val) => ref
-                      .read(authControllerProvider.notifier)
-                      .updateProfile(iban: val),
+                const SizedBox(height: 48),
+                FilledButton(
+                  onPressed: () =>
+                      ref.read(authControllerProvider.notifier).logout(),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.red.withValues(alpha: 0.8),
+                  ),
+                  child: const Text('Log Out'),
                 ),
-              ),
-
-              const SizedBox(height: 24),
-              _buildSectionHeader("Settings"),
-
-              ListTile(
-                leading: const Icon(Icons.attach_money),
-                title: const Text('Default Currency'),
-                subtitle: Text(user.defaultCurrency),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  showCurrencyPicker(
-                    context: context,
-                    showFlag: true,
-                    showCurrencyName: true,
-                    showCurrencyCode: true,
-                    onSelect: (Currency currency) {
-                      ref
-                          .read(authControllerProvider.notifier)
-                          .updateProfile(currency: currency.code);
-                    },
-                    theme: CurrencyPickerThemeData(
-                      backgroundColor: Theme.of(context).cardColor,
-                      titleTextStyle: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                      subtitleTextStyle: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 48),
-              FilledButton(
-                onPressed: () =>
-                    ref.read(authControllerProvider.notifier).logout(),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.red.withValues(alpha: 0.8),
-                ),
-                child: const Text('Log Out'),
-              ),
-            ],
+              ],
+            ),
           );
         },
         error: (e, st) => Center(child: Text('Error: $e')),

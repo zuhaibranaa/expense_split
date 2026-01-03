@@ -136,6 +136,17 @@ class AuthRepository {
     await _saveSession(_currentUser!);
   }
 
+  Future<User?> refreshUser() async {
+    try {
+      final response = await _api.get('/auth/me');
+      _currentUser = User.fromJson(response);
+      await _saveSession(_currentUser!);
+      return _currentUser;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<String> uploadAvatar(XFile file) async {
     dynamic response;
     if (kIsWeb) {
@@ -263,6 +274,14 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
         iban: iban,
       );
       return repo.currentUser;
+    });
+  }
+
+  Future<void> reloadUser() async {
+    final repo = ref.read(authRepositoryProvider);
+    state = await AsyncValue.guard(() async {
+      final user = await repo.refreshUser();
+      return user;
     });
   }
 

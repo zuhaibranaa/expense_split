@@ -63,8 +63,8 @@ class ExpensesRepository {
     });
   }
 
-  Future<void> deleteExpense(int groupId, int expenseId, int userId) async {
-    await _api.delete('/groups/$groupId/expenses/$expenseId?user_id=$userId');
+  Future<void> deleteExpense(int expenseId, int userId) async {
+    await _api.delete('/expenses/$expenseId?user_id=$userId');
   }
 }
 
@@ -159,7 +159,7 @@ class ExpensesNotifier
     }
 
     try {
-      await repo.deleteExpense(arg, expenseId, userId);
+      await repo.deleteExpense(expenseId, userId);
     } catch (e) {
       state = previousState;
       rethrow;
