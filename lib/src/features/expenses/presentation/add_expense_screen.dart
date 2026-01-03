@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/expenses_repository.dart';
 import '../../people/data/members_repository.dart';
@@ -35,6 +36,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   SplitMethod _splitMethod = SplitMethod.equal;
   final Map<int, TextEditingController> _splitControllers = {};
   bool _isInit = true;
+  InterstitialAd? _interstitialAd;
 
   @override
   void didChangeDependencies() {
@@ -52,11 +54,15 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         );
       }
     }
+    if (_isInit) {
+      _loadAd();
+    }
     _isInit = false;
   }
 
   @override
   void dispose() {
+    _interstitialAd?.dispose();
     _descriptionController.dispose();
     _amountController.dispose();
     for (var c in _splitControllers.values) {
@@ -607,6 +613,11 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               date: DateTime.now(),
               splits: splits,
             );
+        if (_interstitialAd != null) {
+          _interstitialAd!.show();
+        } else {
+          if (navigator.mounted) navigator.pop();
+        }
       } else {
         final user = ref.read(authControllerProvider).value;
         if (user != null) {
@@ -632,5 +643,31 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
+  }
+
+  void _loadAd() {
+    InterstitialAd.load(
+      adUnitId: 'ca-app-pub-3940256099942544/1033173712', // Test ID
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          _interstitialAd = ad;
+          _interstitialAd!.fullScreenContentCallback =
+              FullScreenContentCallback(
+                onAdDismissedFullScreenContent: (ad) {
+                  ad.dispose();
+                  if (mounted) Navigator.of(context).pop();
+                },
+                onAdFailedToShowFullScreenContent: (ad, error) {
+                  ad.dispose();
+                  if (mounted) Navigator.of(context).pop();
+                },
+              );
+        },
+        onAdFailedToLoad: (err) {
+          debugPrint('Failed to load an interstitial ad: ${err.message}');
+        },
+      ),
+    );
   }
 }

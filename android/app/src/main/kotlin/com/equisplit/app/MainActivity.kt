@@ -1,4 +1,4 @@
-package com.equisplit.appit.app
+package com.equisplit.app
 
 import io.flutter.embedding.android.FlutterActivity
 
