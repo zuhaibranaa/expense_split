@@ -165,10 +165,9 @@ class ExpensesListScreen extends ConsumerWidget {
     WidgetRef ref,
     Expense expense,
     List<Member> members,
-  ) async {
+  ) {
     final user = ref.read(authControllerProvider).value;
     final isCreatorOrPayer = user != null && (user.id == expense.payerId);
-    // Ideally check creator too, but for MVP payer is proxy. Or admin. Set admin later.
     final currentUserMember = members.firstWhere(
       (m) => m.userId == user?.id,
       orElse: () => Member(id: -1, groupId: -1, name: ''),
@@ -176,117 +175,348 @@ class ExpensesListScreen extends ConsumerWidget {
     final isAdmin = currentUserMember.isAdmin == 1;
     final canEdit = isCreatorOrPayer || isAdmin;
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(expense.description),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Amount: $groupCurrency ${expense.amount.toStringAsFixed(2)}',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text('Category: ${expense.category}'),
-            Text('Date: ${DateFormat.yMMMd().format(expense.date)}'),
-            const SizedBox(height: 16),
-            const Text(
-              'Paid by:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            Text(expense.payer?.name ?? 'Unknown'),
-            const SizedBox(height: 16),
-            const Text(
-              'Split between:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            ...expense.splits.map((s) {
-              final m = members.firstWhere(
-                (m) => m.id == s.memberId,
-                orElse: () => Member(id: -1, groupId: -1, name: 'Unknown'),
-              );
-              return Text(
-                '${m.name}: $groupCurrency ${s.amount.toStringAsFixed(2)}',
-              );
-            }),
-          ],
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
         ),
-        actions: [
-          if (canEdit) ...[
-            TextButton.icon(
-              icon: const Icon(Icons.edit, size: 18),
-              label: const Text('Edit'),
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => AddExpenseScreen(
-                      groupId: groupId,
-                      groupCurrency: groupCurrency,
-                      expense: expense,
-                    ),
-                  ),
-                );
-              },
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
             ),
-            TextButton.icon(
-              icon: const Icon(Icons.delete, color: Colors.red, size: 18),
-              label: const Text('Delete', style: TextStyle(color: Colors.red)),
-              onPressed: () async {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Delete Expense?'),
-                    content: const Text(
-                      'Are you sure you want to delete this expense?',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Cancel'),
+            const SizedBox(height: 24),
+
+            // Icon and Amount
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primaryContainer.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Icon(
+                    Icons.receipt_long_rounded,
+                    size: 32,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        expense.description,
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
                       ),
-                      FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.red,
+                      const SizedBox(height: 4),
+                      Text(
+                        DateFormat.yMMMd().format(expense.date),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
-                        onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text('Delete'),
                       ),
                     ],
                   ),
-                );
-
-                if (confirm == true && context.mounted) {
-                  Navigator.pop(dialogContext);
-                  try {
-                    await ref
-                        .read(expensesFutureProvider(groupId).notifier)
-                        .deleteExpense(expense.id, user!.id);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Expense deleted')),
-                      );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                    }
-                  }
-                }
-              },
+                ),
+              ],
             ),
+
+            const SizedBox(height: 32),
+
+            // Amount Display
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outline.withValues(alpha: 0.1),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    'Total Amount',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.secondary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '$groupCurrency ${expense.amount.toStringAsFixed(2)}',
+                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 32),
+
+            // People Involved
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Payer
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSectionLabel(context, 'PAID BY'),
+                      const SizedBox(height: 12),
+                      _buildPersonCard(
+                        context,
+                        expense.payer?.name ?? 'Unknown',
+                        null, // Payer avatar URL not strictly in model yet or needs lookup
+                        isPayer: true,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Split With
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSectionLabel(context, 'SPLIT WITH'),
+                      const SizedBox(height: 12),
+                      // Stacked avatars or list
+                      if (expense.splits.isEmpty)
+                        Text(
+                          'No splits',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        )
+                      else
+                        Wrap(
+                          spacing: -8,
+                          runSpacing: 8,
+                          children: expense.splits.map((split) {
+                            final memberValue = members.firstWhere(
+                              (m) => m.id == split.memberId,
+                              orElse: () =>
+                                  Member(id: -1, groupId: -1, name: 'User'),
+                            );
+                            return Tooltip(
+                              message:
+                                  '${memberValue.name}: $groupCurrency${split.amount.toStringAsFixed(2)}',
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.surface,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: _buildAvatar(
+                                  memberValue.name,
+                                  memberValue.avatarUrl,
+                                  radius: 18,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 40),
+
+            // Actions
+            if (canEdit)
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Delete Expense?'),
+                            content: const Text(
+                              'Are you sure you want to delete this expense?',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text('Cancel'),
+                              ),
+                              FilledButton(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: Theme.of(
+                                    context,
+                                  ).colorScheme.error,
+                                ),
+                                onPressed: () => Navigator.pop(ctx, true),
+                                child: const Text('Delete'),
+                              ),
+                            ],
+                          ),
+                        );
+
+                        if (confirm == true && context.mounted) {
+                          Navigator.pop(context); // Close bottom sheet
+                          try {
+                            await ref
+                                .read(expensesFutureProvider(groupId).notifier)
+                                .deleteExpense(expense.id, user!.id);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Expense deleted'),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e')),
+                              );
+                            }
+                          }
+                        }
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: BorderSide(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        foregroundColor: Theme.of(context).colorScheme.error,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text('Delete'),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AddExpenseScreen(
+                              groupId: groupId,
+                              groupCurrency: groupCurrency,
+                              expense: expense,
+                            ),
+                          ),
+                        );
+                      },
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      icon: const Icon(Icons.edit_rounded),
+                      label: const Text('Edit Expense'),
+                    ),
+                  ),
+                ],
+              ),
           ],
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Close'),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionLabel(BuildContext context, String text) {
+    return Text(
+      text,
+      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+        fontWeight: FontWeight.bold,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        letterSpacing: 1.0,
+      ),
+    );
+  }
+
+  Widget _buildPersonCard(
+    BuildContext context,
+    String name,
+    String? avatarUrl, {
+    bool isPayer = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildAvatar(name, avatarUrl, radius: 20),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              name,
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildAvatar(String? name, String? avatarUrl, {double radius = 16}) {
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: Colors.grey.shade200,
+      backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+      child: avatarUrl == null
+          ? Text(
+              name != null && name.isNotEmpty ? name[0].toUpperCase() : '?',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: radius * 0.9,
+                color: Colors.black87,
+              ),
+            )
+          : null,
     );
   }
 }
