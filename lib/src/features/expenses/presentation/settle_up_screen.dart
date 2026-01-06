@@ -33,7 +33,9 @@ class _SettleUpScreenState extends ConsumerState<SettleUpScreen> {
   @override
   void initState() {
     super.initState();
-    _amountController = TextEditingController(text: widget.amount.toStringAsFixed(2));
+    _amountController = TextEditingController(
+      text: widget.amount.toStringAsFixed(2),
+    );
     _dateController.text = DateFormat.yMMMd().format(_selectedDate);
   }
 
@@ -71,22 +73,25 @@ class _SettleUpScreenState extends ConsumerState<SettleUpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await ref.read(expensesRepositoryProvider).createExpense(
-        groupId: widget.groupId,
-        description: 'Payment from ${widget.payer.name} to ${widget.receiver.name}',
-        amount: amount,
-        payerId: widget.payer.id,
-        category: 'Payment',
-        date: _selectedDate,
-        splits: {widget.receiver.id: amount},
-        isSettlement: true,
-      );
+      await ref
+          .read(expensesRepositoryProvider)
+          .createExpense(
+            groupId: widget.groupId,
+            description:
+                'Payment from ${widget.payer.name} to ${widget.receiver.name}',
+            amount: amount,
+            payerId: widget.payer.id,
+            category: 'Payment',
+            date: _selectedDate,
+            splits: {widget.receiver.id: amount},
+            isSettlement: true,
+          );
 
       if (mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Settlement recorded!')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Settlement recorded!')));
       }
     } catch (e) {
       if (mounted) {
@@ -102,9 +107,7 @@ class _SettleUpScreenState extends ConsumerState<SettleUpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settle Up'),
-      ),
+      appBar: AppBar(title: const Text('Settle Expense')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -112,16 +115,22 @@ class _SettleUpScreenState extends ConsumerState<SettleUpScreen> {
             // Transfer Icon
             const Icon(Icons.compare_arrows, size: 64, color: Colors.blue),
             const SizedBox(height: 16),
-            
+
             // Text explanation
             RichText(
               textAlign: TextAlign.center,
               text: TextSpan(
                 style: Theme.of(context).textTheme.headlineSmall,
                 children: [
-                  TextSpan(text: widget.payer.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  TextSpan(
+                    text: widget.payer.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   const TextSpan(text: ' paid '),
-                  TextSpan(text: widget.receiver.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  TextSpan(
+                    text: widget.receiver.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ],
               ),
             ),
@@ -136,7 +145,9 @@ class _SettleUpScreenState extends ConsumerState<SettleUpScreen> {
                 border: const OutlineInputBorder(),
                 helperText: 'Enter the amount paid',
               ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
               enabled: !_isLoading,
@@ -166,9 +177,16 @@ class _SettleUpScreenState extends ConsumerState<SettleUpScreen> {
               height: 50,
               child: FilledButton.icon(
                 onPressed: _isLoading ? null : _submit,
-                icon: _isLoading 
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.check),
+                icon: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.check),
                 label: const Text('Record Payment'),
               ),
             ),

@@ -18,7 +18,7 @@ class MembersListView extends ConsumerWidget {
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.small(
-        onPressed: () => _showAddMemberDialog(context, ref),
+        onPressed: () => _showAddMemberDialog(context),
         tooltip: 'Add Person',
         child: const Icon(Icons.person_add),
       ),
@@ -186,41 +186,89 @@ class MembersListView extends ConsumerWidget {
     }
   }
 
-  void _showAddMemberDialog(BuildContext context, WidgetRef ref) {
-    final nameController = TextEditingController();
+  void _showAddMemberDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Person'),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(
-            labelText: 'Name',
-            hintText: 'e.g. Alice',
-          ),
-          textCapitalization: TextCapitalization.words,
-          autofocus: true,
+      builder: (context) => AddMemberDialog(groupId: groupId),
+    );
+  }
+}
+
+class AddMemberDialog extends ConsumerStatefulWidget {
+  final int groupId;
+
+  const AddMemberDialog({super.key, required this.groupId});
+
+  @override
+  ConsumerState<AddMemberDialog> createState() => _AddMemberDialogState();
+}
+
+class _AddMemberDialogState extends ConsumerState<AddMemberDialog> {
+  final _nameController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _addMember() async {
+    if (_nameController.text.trim().isEmpty) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      await ref
+          .read(membersFutureProvider(widget.groupId).notifier)
+          .addMember(_nameController.text.trim());
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error adding member: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add Person'),
+      content: TextField(
+        controller: _nameController,
+        decoration: const InputDecoration(
+          labelText: 'Name',
+          hintText: 'e.g. Alice',
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              if (nameController.text.isNotEmpty) {
-                await ref
-                    .read(membersFutureProvider(groupId).notifier)
-                    .addMember(nameController.text.trim());
-                if (context.mounted) {
-                  Navigator.pop(context);
-                }
-              }
-            },
-            child: const Text('Add'),
-          ),
-        ],
+        textCapitalization: TextCapitalization.words,
+        autofocus: true,
+        enabled: !_isLoading,
+        onSubmitted: (_) => _addMember(),
       ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _isLoading ? null : _addMember,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Add'),
+        ),
+      ],
     );
   }
 }

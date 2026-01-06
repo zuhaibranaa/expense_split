@@ -165,8 +165,8 @@ class BalancesScreen extends ConsumerWidget {
                                       ),
                                     );
                                   },
-                                  icon: const Icon(Icons.check),
-                                  label: const Text('Settle Up'),
+                                  icon: const Icon(Icons.payment, size: 16),
+                                  label: const Text('Pay'),
                                 ),
                               ],
                             ),
