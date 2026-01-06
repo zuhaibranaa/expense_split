@@ -53,6 +53,7 @@ class AppTheme {
         ),
         labelStyle: const TextStyle(color: Colors.grey),
         prefixIconColor: _primaryColor,
+        suffixIconColor: _primaryColor,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(

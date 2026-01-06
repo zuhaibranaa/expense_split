@@ -13,8 +13,10 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _nameController = TextEditingController();
   String _currency = 'USD';
+  bool _obscurePassword = true;
 
   int _step =
       0; // 0: Email, 1: Password (Login) or Password (Register), 2: Profile (Register)
@@ -92,6 +94,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           .register(
             _emailController.text.trim(),
             _passwordController.text,
+            _confirmPasswordController.text,
             _nameController.text.trim().isEmpty
                 ? 'User'
                 : _nameController.text.trim(),
@@ -227,6 +230,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   decoration: InputDecoration(
                     labelText: 'Password',
                     prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
                     border: const OutlineInputBorder(),
                     enabledBorder: _errorMessage != null
                         ? const OutlineInputBorder(
@@ -239,16 +254,60 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           )
                         : null,
                   ),
-                  obscureText: true,
+                  obscureText: _obscurePassword,
                   autofocus: true,
                   onChanged: (_) {
                     if (_errorMessage != null) {
                       setState(() => _errorMessage = null);
                     }
                   },
-                  onSubmitted: (_) =>
-                      _isNewUser ? _handleRegisterNext() : _handleLogin(),
+                  onSubmitted: (_) => _isNewUser ? () => null : _handleLogin(),
                 ),
+                if (_isNewUser) ...[
+                  const SizedBox(height: 16),
+
+                  TextField(
+                    controller: _confirmPasswordController,
+                    decoration: InputDecoration(
+                      labelText: 'Confirm Password',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _obscurePassword = !_obscurePassword;
+                          });
+                        },
+                      ),
+                      border: const OutlineInputBorder(),
+                      enabledBorder: _errorMessage != null
+                          ? const OutlineInputBorder(
+                              borderSide: BorderSide(color: Colors.red),
+                            )
+                          : null,
+                      focusedBorder: _errorMessage != null
+                          ? const OutlineInputBorder(
+                              borderSide: BorderSide(
+                                color: Colors.red,
+                                width: 2,
+                              ),
+                            )
+                          : null,
+                    ),
+                    obscureText: _obscurePassword,
+                    autofocus: false,
+                    onChanged: (_) {
+                      if (_errorMessage != null) {
+                        setState(() => _errorMessage = null);
+                      }
+                    },
+                    onSubmitted: (_) => _handleRegisterNext(),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 FilledButton(
                   onPressed: isLoading

@@ -74,13 +74,14 @@ class AuthRepository {
   Future<void> register(
     String email,
     String password,
+    String confirmPassword,
     String name,
     String currency,
   ) async {
     final response = await _api.post('/auth/register', {
       'email': email,
       'password': password,
-      'password_confirmation': password,
+      'password_confirmation': confirmPassword,
       'name': name,
       'currency': currency,
     });
@@ -242,12 +243,13 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
   Future<void> register(
     String email,
     String password,
+    String confirmPassword,
     String name,
     String currency,
   ) async {
     final repo = ref.read(authRepositoryProvider);
     // Do not set global loading state here to prevent UI reset
-    await repo.register(email, password, name, currency);
+    await repo.register(email, password, confirmPassword, name, currency);
     state = AsyncValue.data(repo.currentUser);
   }
 
