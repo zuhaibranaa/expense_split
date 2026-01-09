@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../groups/data/groups_repository.dart';
 import '../../auth/data/auth_repository.dart';
 import '../data/members_repository.dart';
@@ -15,6 +16,7 @@ class MembersListView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final membersAsync = ref.watch(membersFutureProvider(groupId));
+    final currentUser = ref.watch(authRepositoryProvider).currentUser;
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.small(
@@ -25,8 +27,38 @@ class MembersListView extends ConsumerWidget {
       body: membersAsync.when(
         data: (members) {
           if (members.isEmpty) {
-            return const Center(child: Text('No people in this group yet.'));
+            return RefreshIndicator(
+              onRefresh: () async {
+                return await ref.refresh(membersFutureProvider(groupId).future);
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.7,
+                  child: const Center(
+                    child: Text('No people in this group yet.'),
+                  ),
+                ),
+              ),
+            );
           }
+
+          // We need current user's member profile in this group to check for "SuperAdmin" (isAdmin=1)
+          // Since we don't have it easily available, we can find it in the members list.
+          // Fallback to basic user check if needed.
+          final currentMember = members.firstWhere(
+            (m) => m.userId == currentUser?.id,
+            orElse: () => Member(
+              id: -1,
+              groupId: groupId,
+              name: '',
+              userId: null,
+              isAdmin: 0,
+            ),
+          );
+
+          final isSuperAdmin = currentMember.isAdmin == 1;
+
           return RefreshIndicator(
             onRefresh: () async {
               return await ref.refresh(membersFutureProvider(groupId).future);
@@ -35,64 +67,45 @@ class MembersListView extends ConsumerWidget {
               itemCount: members.length,
               itemBuilder: (context, index) {
                 final member = members[index];
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundImage: member.avatarUrl != null
-                        ? NetworkImage(member.avatarUrl!)
-                        : null,
-                    child: member.avatarUrl == null
-                        ? Text(member.name[0].toUpperCase())
-                        : null,
-                  ),
-                  title: Text(member.name),
-                  subtitle: Row(
+
+                // Permission Logic:
+                // Edit: Self OR (CurrentUser is SuperAdmin)
+                // Delete: CurrentUser is SuperAdmin ONLY
+                final isSelf = member.userId == currentUser?.id;
+                final canEdit = isSelf || isSuperAdmin;
+                final canDelete = isSuperAdmin && !isSelf;
+
+                // If no actions available, just return the ListTile
+                if (!canEdit && !canDelete) {
+                  return _buildMemberTile(context, ref, member);
+                }
+
+                return Slidable(
+                  key: ValueKey(member.id),
+                  endActionPane: ActionPane(
+                    motion: const ScrollMotion(),
                     children: [
-                      if (member.isAdmin == 1)
-                        Container(
-                          margin: const EdgeInsets.only(right: 8),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade100,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.blue.shade300),
-                          ),
-                          child: Text(
-                            'Admin',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue.shade800,
-                            ),
-                          ),
+                      if (canEdit)
+                        SlidableAction(
+                          onPressed: (context) =>
+                              _showEditMemberDialog(context, ref, member),
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          icon: Icons.edit,
+                          label: 'Edit',
                         ),
-                      if (member.userId != null)
-                        const Text(
-                          'Verified User',
-                          style: TextStyle(fontSize: 12, color: Colors.green),
+                      if (canDelete)
+                        SlidableAction(
+                          onPressed: (context) =>
+                              _showRemoveMemberDialog(context, ref, member),
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          icon: Icons.delete,
+                          label: 'Delete',
                         ),
                     ],
                   ),
-                  trailing: member.userId == null
-                      ? TextButton.icon(
-                          icon: const Icon(Icons.link),
-                          label: const Text('Invite'),
-                          onPressed: () =>
-                              _generateInvite(context, ref, member),
-                        )
-                      : const Icon(Icons.chevron_right),
-                  onTap: () {
-                    if (member.userId != null) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => MemberProfileScreen(member: member),
-                        ),
-                      );
-                    }
-                  },
+                  child: _buildMemberTile(context, ref, member),
                 );
               },
             ),
@@ -101,6 +114,64 @@ class MembersListView extends ConsumerWidget {
         error: (err, st) => Center(child: Text('Error: $err')),
         loading: () => const Center(child: CircularProgressIndicator()),
       ),
+    );
+  }
+
+  Widget _buildMemberTile(BuildContext context, WidgetRef ref, Member member) {
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundImage: member.avatarUrl != null
+            ? NetworkImage(member.avatarUrl!)
+            : null,
+        child: member.avatarUrl == null
+            ? Text(member.name.isNotEmpty ? member.name[0].toUpperCase() : '?')
+            : null,
+      ),
+      title: Text(member.name),
+      subtitle: Row(
+        children: [
+          if (member.isAdmin == 1)
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade100,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.shade300),
+              ),
+              child: Text(
+                'Admin',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue.shade800,
+                ),
+              ),
+            ),
+          if (member.userId != null)
+            const Text(
+              'Verified User',
+              style: TextStyle(fontSize: 12, color: Colors.green),
+            ),
+        ],
+      ),
+      trailing: member.userId == null
+          ? TextButton.icon(
+              icon: const Icon(Icons.link),
+              label: const Text('Invite'),
+              onPressed: () => _generateInvite(context, ref, member),
+            )
+          : const Icon(Icons.chevron_right),
+      onTap: () {
+        if (member.userId != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MemberProfileScreen(member: member),
+            ),
+          );
+        }
+      },
     );
   }
 
@@ -190,6 +261,170 @@ class MembersListView extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => AddMemberDialog(groupId: groupId),
+    );
+  }
+
+  void _showEditMemberDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Member member,
+  ) {
+    final nameController = TextEditingController(text: member.name);
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        bool isLoading = false;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Edit Member Name'),
+              content: TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Name',
+                  prefixIcon: Icon(Icons.person),
+                ),
+                enabled: !isLoading,
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isLoading
+                      ? null
+                      : () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          if (nameController.text.trim().isEmpty) return;
+
+                          setState(() => isLoading = true);
+                          try {
+                            final user = ref
+                                .read(authRepositoryProvider)
+                                .currentUser;
+                            if (user == null) return;
+
+                            await ref
+                                .read(membersFutureProvider(groupId).notifier)
+                                .updateMember(
+                                  member.id,
+                                  user.id,
+                                  name: nameController.text.trim(),
+                                );
+
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+                            }
+                          } catch (e) {
+                            setState(() => isLoading = false);
+                            if (dialogContext.mounted) {
+                              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showRemoveMemberDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Member member,
+  ) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        bool isLoading = false;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Remove Member'),
+              content: Text(
+                'Are you sure you want to remove ${member.name} from this group?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          setState(() => isLoading = true);
+
+                          try {
+                            final user = ref
+                                .read(authRepositoryProvider)
+                                .currentUser;
+                            if (user == null) return;
+
+                            await ref
+                                .read(membersFutureProvider(groupId).notifier)
+                                .removeMember(member.id, user.id);
+
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '${member.name} removed from group',
+                                  ),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            setState(() => isLoading = false);
+                            if (dialogContext.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                  style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Remove'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

@@ -6,7 +6,7 @@ import '../domain/expense_model.dart';
 import 'package:intl/intl.dart';
 import '../../people/domain/member_model.dart';
 import '../../groups/data/groups_repository.dart';
-import '../../../core/network/websocket_service.dart';
+// import '../../../core/network/websocket_service.dart';
 import '../../auth/data/auth_repository.dart';
 import 'add_expense_screen.dart';
 
@@ -26,25 +26,25 @@ class ExpensesListScreen extends ConsumerWidget {
     final membersAsync = ref.watch(groupMembersProvider(groupId));
 
     // Listen for WebSocket events for this group
-    ref.listen(webSocketEventsProvider, (previous, next) {
-      next.whenData((event) {
-        if (event['group_id'] == groupId) {
-          // Refresh expenses
-          ref.invalidate(expensesFutureProvider(groupId));
+    // ref.listen(webSocketEventsProvider, (previous, next) {
+    //   next.whenData((event) {
+    //     if (event['group_id'] == groupId) {
+    //       // Refresh expenses
+    //       ref.invalidate(expensesFutureProvider(groupId));
 
-          // Show notification if it's a new expense (and not by me? backend doesn't tell 'me' distinctively yet, but user knows)
-          if (event['type'] == 'expense_created') {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(event['message'] ?? 'New expense added'),
-                behavior: SnackBarBehavior.floating,
-                backgroundColor: Theme.of(context).colorScheme.secondary,
-              ),
-            );
-          }
-        }
-      });
-    });
+    //       // Show notification if it's a new expense (and not by me? backend doesn't tell 'me' distinctively yet, but user knows)
+    //       if (event['type'] == 'expense_created') {
+    //         ScaffoldMessenger.of(context).showSnackBar(
+    //           SnackBar(
+    //             content: Text(event['message'] ?? 'New expense added'),
+    //             behavior: SnackBarBehavior.floating,
+    //             backgroundColor: Theme.of(context).colorScheme.secondary,
+    //           ),
+    //         );
+    //       }
+    //     }
+    //   });
+    // });
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
@@ -64,7 +64,20 @@ class ExpensesListScreen extends ConsumerWidget {
       body: expensesAsync.when(
         data: (items) {
           if (items.isEmpty) {
-            return const Center(child: Text('No expenses yet. Add one!'));
+            return RefreshIndicator(
+              onRefresh: () async {
+                return await ref.refresh(
+                  expensesFutureProvider(groupId).future,
+                );
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.7,
+                  child: const Center(child: Text('No expenses yet. Add one!')),
+                ),
+              ),
+            );
           }
           return RefreshIndicator(
             onRefresh: () async {

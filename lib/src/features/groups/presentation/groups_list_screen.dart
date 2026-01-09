@@ -27,23 +27,34 @@ class GroupsListScreen extends ConsumerWidget {
       body: groupsAsync.when(
         data: (groups) {
           if (groups.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.group_outlined,
-                    size: 80,
-                    color: Theme.of(context).colorScheme.secondary,
+            return RefreshIndicator(
+              onRefresh: () async {
+                return await ref.refresh(groupsListProvider.future);
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.7,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.group_outlined,
+                          size: 80,
+                          color: Theme.of(context).colorScheme.secondary,
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          'No groups yet',
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text('Create a group to start tracking expenses'),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'No groups yet',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  const Text('Create a group to start tracking expenses'),
-                ],
+                ),
               ),
             );
           }

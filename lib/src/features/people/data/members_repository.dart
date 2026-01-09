@@ -27,8 +27,8 @@ class MembersRepository {
     });
   }
 
-  Future<void> removeMember(int groupId, int memberId, int userId) async {
-    await _api.delete('/groups/$groupId/members/$memberId?user_id=$userId');
+  Future<void> removeMember(int memberId, int userId) async {
+    await _api.delete('/members/$memberId?user_id=$userId');
   }
 }
 
@@ -107,7 +107,7 @@ class MembersNotifier
     }
 
     try {
-      await repo.removeMember(arg, memberId, userId);
+      await repo.removeMember(memberId, userId);
     } catch (e) {
       state = previousState;
       rethrow;

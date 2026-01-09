@@ -318,32 +318,57 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setState) {
+            final allSelected = _selectedMemberIds.length == members.length;
+
             return AlertDialog(
               title: const Text('Split with'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  children: members.map((m) {
-                    return CheckboxListTile(
-                      title: Text(m.name),
-                      value: _selectedMemberIds.contains(m.id),
+                  children: [
+                    CheckboxListTile(
+                      title: _buildMemberStack(members),
+                      value: allSelected,
                       onChanged: (bool? value) {
                         setState(() {
                           if (value == true) {
-                            _selectedMemberIds.add(m.id);
+                            _selectedMemberIds.addAll(members.map((m) => m.id));
                           } else {
-                            // prevent deselecting the last one?
-                            if (_selectedMemberIds.length > 1) {
-                              _selectedMemberIds.remove(m.id);
-                            }
+                            _selectedMemberIds.clear();
                           }
                         });
-                        // Update parent state too to reflect changes immediately if needed,
-                        // but usually we wait for dialog close. However, to keep UI sync:
                         this.setState(() {});
                       },
-                    );
-                  }).toList(),
+                    ),
+                    ...members.map((m) {
+                      return CheckboxListTile(
+                        title: Text(m.name),
+                        secondary: CircleAvatar(
+                          backgroundImage: m.avatarUrl != null
+                              ? NetworkImage(m.avatarUrl!)
+                              : null,
+                          child: m.avatarUrl == null
+                              ? Text(
+                                  m.name.isNotEmpty
+                                      ? m.name[0].toUpperCase()
+                                      : '?',
+                                )
+                              : null,
+                        ),
+                        value: _selectedMemberIds.contains(m.id),
+                        onChanged: (bool? value) {
+                          setState(() {
+                            if (value == true) {
+                              _selectedMemberIds.add(m.id);
+                            } else {
+                              _selectedMemberIds.remove(m.id);
+                            }
+                          });
+                          this.setState(() {});
+                        },
+                      );
+                    }),
+                  ],
                 ),
               ),
               actions: [
@@ -643,6 +668,70 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
+  }
+
+  Widget _buildMemberStack(List<Member> membersToDisplay) {
+    if (membersToDisplay.isEmpty) return const SizedBox();
+
+    const double overlap = 10.0;
+    const double avatarSize = 30.0;
+    const int maxVisible = 5;
+
+    final visibleCount = membersToDisplay.length > maxVisible
+        ? maxVisible
+        : membersToDisplay.length;
+    final remainingCount = membersToDisplay.length - visibleCount;
+
+    return SizedBox(
+      height: avatarSize,
+      child: Stack(
+        children: [
+          ...List.generate(visibleCount, (index) {
+            return Positioned(
+              left: index * (avatarSize - overlap),
+              child: CircleAvatar(
+                radius: avatarSize / 2,
+                backgroundColor: Colors.white,
+                child: CircleAvatar(
+                  radius: (avatarSize / 2) - 1,
+                  backgroundImage: membersToDisplay[index].avatarUrl != null
+                      ? NetworkImage(membersToDisplay[index].avatarUrl!)
+                      : null,
+                  child: membersToDisplay[index].avatarUrl == null
+                      ? Text(
+                          membersToDisplay[index].name.isNotEmpty
+                              ? membersToDisplay[index].name[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(fontSize: 10),
+                        )
+                      : null,
+                ),
+              ),
+            );
+          }),
+          if (remainingCount > 0)
+            Positioned(
+              left: visibleCount * (avatarSize - overlap),
+              child: CircleAvatar(
+                radius: avatarSize / 2,
+                backgroundColor: Colors.white,
+                child: CircleAvatar(
+                  radius: (avatarSize / 2) - 1,
+                  backgroundColor: Colors.grey.shade300,
+                  foregroundColor: Colors.black,
+                  child: Text(
+                    '+$remainingCount',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   void _loadAd() {

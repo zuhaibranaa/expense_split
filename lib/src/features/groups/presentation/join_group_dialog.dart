@@ -31,6 +31,10 @@ class _JoinGroupDialogState extends ConsumerState<JoinGroupDialog> {
       await ref
           .read(groupsRepositoryProvider)
           .claimInvite(_tokenController.text.trim(), user.id);
+
+      // Invalidate the groups list so it refreshes immediately with the new group
+      ref.invalidate(groupsListProvider);
+
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(

@@ -40,7 +40,7 @@ class Member {
       isAdmin: isAdminInt,
       iban: user != null ? user['iban'] : null,
       avatarUrl: user != null ? user['avatar_url'] : null,
-      email: user != null ? json['email'] : null,
+      email: user != null ? user['email'] : null,
       phone: user != null ? user['phone'] : null,
     );
   }
