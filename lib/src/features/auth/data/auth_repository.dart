@@ -112,6 +112,9 @@ class AuthRepository {
     String? currency,
     String? phone,
     String? iban,
+    String? password,
+    String? passwordConfirmation,
+    bool shouldHandleError = true,
   }) async {
     if (_currentUser == null) return;
 
@@ -125,7 +128,10 @@ class AuthRepository {
       'default_currency': currency ?? _currentUser!.defaultCurrency,
       'phone': phone ?? _currentUser!.phone,
       'iban': iban ?? _currentUser!.iban,
-    });
+      if (password != null) 'password': password,
+      if (passwordConfirmation != null)
+        'password_confirmation': passwordConfirmation,
+    }, shouldHandleError: shouldHandleError);
 
     // If response is the user object directly (data['user'] or just data=user)
     // The previous code expected response to be the user json.
@@ -264,19 +270,30 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
     String? currency,
     String? phone,
     String? iban,
+    String? password,
+    String? passwordConfirmation,
+    bool shouldHandleError = true,
   }) async {
     final repo = ref.read(authRepositoryProvider);
     // Don't set loading state to prevent AuthGate from rebuilding entire app
-    state = await AsyncValue.guard(() async {
+    try {
       await repo.updateProfile(
         name: name,
         avatarUrl: avatarUrl,
         currency: currency,
         phone: phone,
         iban: iban,
+        password: password,
+        passwordConfirmation: passwordConfirmation,
+        shouldHandleError: shouldHandleError,
       );
-      return repo.currentUser;
-    });
+      state = AsyncValue.data(repo.currentUser);
+    } catch (e) {
+      // Do NOT set state = AsyncValue.error(e) here.
+      // Doing so triggers AuthGate to show LoginScreen because global state becomes error.
+      // We just rethrow so the UI (dialog) handles the specific validation error.
+      rethrow;
+    }
   }
 
   Future<void> reloadUser() async {

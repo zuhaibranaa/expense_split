@@ -64,6 +64,7 @@ class _StatsContentState extends ConsumerState<_StatsContent> {
         // Calculate Category Data
         final categoryMap = <String, double>{};
         for (var e in expenses) {
+          if (e.category == 'Payment') continue;
           categoryMap[e.category] = (categoryMap[e.category] ?? 0) + e.amount;
         }
 

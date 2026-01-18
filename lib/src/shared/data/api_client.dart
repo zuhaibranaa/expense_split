@@ -72,13 +72,17 @@ class ApiClient {
     }
   }
 
-  Future<dynamic> put(String endpoint, Map<String, dynamic> body) async {
+  Future<dynamic> put(
+    String endpoint,
+    Map<String, dynamic> body, {
+    bool shouldHandleError = true,
+  }) async {
     final response = await http.put(
       Uri.parse('$baseUrl$endpoint'),
       headers: _getHeaders(),
       body: jsonEncode(body),
     );
-    return _handleResponse(response);
+    return _handleResponse(response, shouldHandleError: shouldHandleError);
   }
 
   Future<dynamic> delete(String endpoint) async {
@@ -159,7 +163,7 @@ class ApiClient {
       );
       if (shouldHandleError) {
         GlobalErrorHandler.showError(errorMessage);
-        throw Exception('API Error: ${response.statusCode} ${response.body}');
+        throw Exception(errorMessage);
       } else {
         throw Exception(errorMessage);
       }
@@ -172,8 +176,28 @@ class ApiClient {
       if (json is Map<String, dynamic>) {
         if (json.containsKey('message')) {
           // If 'errors' field exists (Laravel validation errors likely), append it
-          if (json['errors'] != null) {
-            return "${json['message']} (${json['errors']})";
+          if (json['errors'] != null && json['errors'] is Map) {
+            final errors = json['errors'] as Map<String, dynamic>;
+            final message = json['message'].toString();
+            final buffer = StringBuffer();
+            buffer.writeln(message);
+
+            errors.forEach((key, value) {
+              if (value is List) {
+                for (var jsVal in value) {
+                  final errStr = jsVal.toString();
+                  if (errStr != message) {
+                    buffer.writeln('• $errStr');
+                  }
+                }
+              } else {
+                final errStr = value.toString();
+                if (errStr != message) {
+                  buffer.writeln('• $errStr');
+                }
+              }
+            });
+            return buffer.toString().trim();
           }
           return json['message'].toString();
         }

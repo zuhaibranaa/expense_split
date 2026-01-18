@@ -659,8 +659,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 splits: splits,
               );
         }
+        if (navigator.mounted) navigator.pop();
       }
-      if (navigator.mounted) navigator.pop();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
