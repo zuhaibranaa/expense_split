@@ -216,6 +216,12 @@ class AuthRepository {
       // ignore
     }
   }
+
+  Future<void> forgotPassword(String email) async {
+    await _api.post('/auth/forgot-password', {
+      'email': email,
+    }, shouldHandleError: false);
+  }
 }
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
@@ -324,5 +330,12 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
     final repo = ref.read(authRepositoryProvider);
     await repo.logout();
     state = const AsyncValue.data(null);
+  }
+
+  Future<void> forgotPassword(String email) async {
+    final repo = ref.read(authRepositoryProvider);
+    // Don't set global loading state to prevent UI reset or navigation issues
+    // Just await and let the UI handle success/error feedback
+    await repo.forgotPassword(email);
   }
 }

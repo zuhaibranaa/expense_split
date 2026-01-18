@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:currency_picker/currency_picker.dart';
 import '../data/auth_repository.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -317,6 +318,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ? const CircularProgressIndicator(color: Colors.white)
                       : Text(_isNewUser ? 'Next' : 'Login'),
                 ),
+                if (!_isNewUser) ...[
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ForgotPasswordScreen(
+                            initialEmail: _emailController.text,
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text('Forgot Password?'),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 TextButton(
                   onPressed: () => setState(() {
