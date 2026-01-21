@@ -93,7 +93,16 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               if (_selectedMemberIds.isEmpty) {
                 _selectedMemberIds.addAll(members.map((m) => m.id));
               }
-              _selectedPayerId = members.first.id;
+              _selectedPayerId =
+                  members
+                      .where(
+                        (m) =>
+                            m.userId ==
+                            ref.read(authRepositoryProvider).currentUser?.id,
+                      )
+                      .firstOrNull
+                      ?.id ??
+                  members.first.id;
             } else {
               // Editing: _selectedMemberIds already handled in didChangeDependencies
               // But we need to ensure at least one is selected? or just fallback to all if empty which shouldn't happen for valid expense
@@ -182,7 +191,12 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     prefixIcon: Icon(Icons.person),
                   ),
                   items: members.map((m) {
-                    return DropdownMenuItem(value: m.id, child: Text(m.name));
+                    var text = m.name;
+                    if (m.userId ==
+                        ref.read(authRepositoryProvider).currentUser?.id) {
+                      text = "Myself";
+                    }
+                    return DropdownMenuItem(value: m.id, child: Text(text));
                   }).toList(),
                   onChanged: (val) {
                     setState(() => _selectedPayerId = val);

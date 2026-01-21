@@ -180,13 +180,6 @@ class ExpensesListScreen extends ConsumerWidget {
     List<Member> members,
   ) {
     final user = ref.read(authControllerProvider).value;
-    final isCreatorOrPayer = user != null && (user.id == expense.payerId);
-    final currentUserMember = members.firstWhere(
-      (m) => m.userId == user?.id,
-      orElse: () => Member(id: -1, groupId: -1, name: ''),
-    );
-    final isAdmin = currentUserMember.isAdmin == 1;
-    final canEdit = isCreatorOrPayer || isAdmin;
 
     showModalBottomSheet(
       context: context,
