@@ -36,6 +36,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   SplitMethod _splitMethod = SplitMethod.equal;
   final Map<int, TextEditingController> _splitControllers = {};
   bool _isInit = true;
+  bool _isLoading = false;
   InterstitialAd? _interstitialAd;
 
   @override
@@ -280,10 +281,23 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
                 const SizedBox(height: 32),
                 FilledButton.icon(
-                  onPressed: () => _submit(members),
-                  icon: const Icon(Icons.check),
+                  onPressed: _isLoading ? null : () => _submit(members),
+                  icon: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.check),
                   label: Text(
-                    widget.expense == null ? 'Save Expense' : 'Update Expense',
+                    _isLoading
+                        ? 'Saving...'
+                        : (widget.expense == null
+                              ? 'Save Expense'
+                              : 'Update Expense'),
                   ),
                 ),
               ],
@@ -640,6 +654,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     }
 
     final navigator = Navigator.of(context);
+    setState(() => _isLoading = true);
     try {
       if (widget.expense == null) {
         await ref
@@ -680,6 +695,10 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
