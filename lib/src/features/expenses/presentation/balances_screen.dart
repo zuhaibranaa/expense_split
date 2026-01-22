@@ -47,13 +47,6 @@ class BalancesScreen extends ConsumerWidget {
           return membersAsync.when(
             data: (members) {
               // Map ID to Name helper
-              String getName(int id) => members
-                  .firstWhere(
-                    (m) => m.id == id,
-                    orElse: () =>
-                        Member(id: -1, groupId: groupId, name: 'Unknown'),
-                  )
-                  .name;
 
               return RefreshIndicator(
                 onRefresh: () async {
@@ -106,6 +99,9 @@ class BalancesScreen extends ConsumerWidget {
                             ),
                           );
 
+                          final fromMember = getMember(transfer.fromMemberId);
+                          final toMember = getMember(transfer.toMemberId);
+
                           return Card(
                             margin: const EdgeInsets.symmetric(
                               horizontal: 16,
@@ -121,11 +117,21 @@ class BalancesScreen extends ConsumerWidget {
                                 children: [
                                   Row(
                                     children: [
-                                      // Avatar or Icon
                                       CircleAvatar(
-                                        child: Text(
-                                          getName(transfer.fromMemberId)[0],
-                                        ),
+                                        backgroundImage:
+                                            fromMember.avatarUrl != null
+                                            ? NetworkImage(
+                                                fromMember.avatarUrl!,
+                                              )
+                                            : null,
+                                        child: fromMember.avatarUrl == null
+                                            ? Text(
+                                                fromMember.name.isNotEmpty
+                                                    ? fromMember.name[0]
+                                                          .toUpperCase()
+                                                    : '?',
+                                              )
+                                            : null,
                                       ),
                                       const Padding(
                                         padding: EdgeInsets.symmetric(
@@ -137,9 +143,18 @@ class BalancesScreen extends ConsumerWidget {
                                         ),
                                       ),
                                       CircleAvatar(
-                                        child: Text(
-                                          getName(transfer.toMemberId)[0],
-                                        ),
+                                        backgroundImage:
+                                            toMember.avatarUrl != null
+                                            ? NetworkImage(toMember.avatarUrl!)
+                                            : null,
+                                        child: toMember.avatarUrl == null
+                                            ? Text(
+                                                toMember.name.isNotEmpty
+                                                    ? toMember.name[0]
+                                                          .toUpperCase()
+                                                    : '?',
+                                              )
+                                            : null,
                                       ),
                                       const SizedBox(width: 16),
                                       Expanded(
@@ -150,18 +165,14 @@ class BalancesScreen extends ConsumerWidget {
                                             ).textTheme.bodyLarge,
                                             children: [
                                               TextSpan(
-                                                text: getName(
-                                                  transfer.fromMemberId,
-                                                ),
+                                                text: fromMember.name,
                                                 style: const TextStyle(
                                                   fontWeight: FontWeight.bold,
                                                 ),
                                               ),
                                               const TextSpan(text: ' owes '),
                                               TextSpan(
-                                                text: getName(
-                                                  transfer.toMemberId,
-                                                ),
+                                                text: toMember.name,
                                                 style: const TextStyle(
                                                   fontWeight: FontWeight.bold,
                                                 ),
