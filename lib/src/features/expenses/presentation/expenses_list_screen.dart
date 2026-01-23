@@ -48,7 +48,7 @@ class ExpensesListScreen extends ConsumerWidget {
     // });
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton.small(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -59,8 +59,8 @@ class ExpensesListScreen extends ConsumerWidget {
             ),
           );
         },
-        tooltip: 'Add Expense',
-        child: const Icon(Icons.receipt_long),
+        label: const Text('Add Expense'),
+        icon: const Icon(Icons.receipt_long),
       ),
       body: expensesAsync.when(
         data: (items) {
