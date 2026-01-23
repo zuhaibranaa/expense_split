@@ -5,6 +5,7 @@ import '../data/expenses_repository.dart';
 import '../../people/data/members_repository.dart';
 import '../../people/domain/member_model.dart';
 import 'settle_up_screen.dart';
+import '../../../shared/utils/currency_utils.dart';
 
 class BalancesScreen extends ConsumerWidget {
   final int groupId;
@@ -189,7 +190,7 @@ class BalancesScreen extends ConsumerWidget {
                                         MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
-                                        "$groupCurrency ${transfer.amount.toStringAsFixed(2)}",
+                                        "${CurrencyUtils.getSymbol(groupCurrency)} ${transfer.amount.toStringAsFixed(2)}",
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 18,

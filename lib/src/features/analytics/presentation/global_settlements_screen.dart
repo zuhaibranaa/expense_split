@@ -7,6 +7,7 @@ import 'package:equisplit/src/features/expenses/domain/balance_calculator.dart';
 import 'package:equisplit/src/features/auth/data/auth_repository.dart';
 import 'package:equisplit/src/features/expenses/presentation/settle_up_screen.dart';
 import 'package:equisplit/src/features/people/domain/member_model.dart';
+import 'package:equisplit/src/shared/utils/currency_utils.dart';
 
 class GlobalSettlementItem {
   final int groupId;
@@ -228,7 +229,7 @@ class GlobalSettlementsScreen extends ConsumerWidget {
                                     style: const TextStyle(fontSize: 16),
                                   ),
                                   Text(
-                                    '${item.groupCurrency} ${amount.toStringAsFixed(2)}',
+                                    '${CurrencyUtils.getSymbol(item.groupCurrency)} ${amount.toStringAsFixed(2)}',
                                     style: TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.bold,

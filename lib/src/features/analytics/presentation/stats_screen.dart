@@ -45,6 +45,22 @@ class _StatsContentState extends ConsumerState<_StatsContent> {
   int _periodIndex =
       2; // 0: Month, 1: Quarter, 2: Year DEFAULTS to YEAR as per screenshot
 
+  List<Expense> _filterExpenses(List<Expense> expenses) {
+    if (_periodIndex == 2) return expenses;
+
+    final now = DateTime.now();
+    return expenses.where((e) {
+      if (_periodIndex == 0) {
+        return e.date.year == now.year && e.date.month == now.month;
+      } else if (_periodIndex == 1) {
+        final currentQuarter = ((now.month - 1) / 3).floor();
+        final expenseQuarter = ((e.date.month - 1) / 3).floor();
+        return e.date.year == now.year && currentQuarter == expenseQuarter;
+      }
+      return true;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final userCurrency =
@@ -55,7 +71,8 @@ class _StatsContentState extends ConsumerState<_StatsContent> {
     );
 
     return allExpensesAsync.when(
-      data: (expenses) {
+      data: (allExpenses) {
+        final expenses = _filterExpenses(allExpenses);
         final totalSpending = expenses.fold(0.0, (sum, e) => sum + e.amount);
         final avgExpense = expenses.isEmpty
             ? 0.0

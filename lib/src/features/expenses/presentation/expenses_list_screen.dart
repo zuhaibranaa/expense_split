@@ -8,6 +8,7 @@ import '../../people/domain/member_model.dart';
 import '../../groups/data/groups_repository.dart';
 // import '../../../core/network/websocket_service.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../../shared/utils/currency_utils.dart';
 import 'add_expense_screen.dart';
 
 class ExpensesListScreen extends ConsumerWidget {
@@ -47,7 +48,7 @@ class ExpensesListScreen extends ConsumerWidget {
     // });
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton.small(
         onPressed: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -58,8 +59,8 @@ class ExpensesListScreen extends ConsumerWidget {
             ),
           );
         },
-        label: const Text('Add Expense'),
-        icon: const Icon(Icons.receipt_long),
+        tooltip: 'Add Expense',
+        child: const Icon(Icons.receipt_long),
       ),
       body: expensesAsync.when(
         data: (items) {
@@ -87,21 +88,80 @@ class ExpensesListScreen extends ConsumerWidget {
               itemCount: items.length,
               itemBuilder: (context, index) {
                 final item = items[index];
+                // Find current user's member ID
+                final user = ref.watch(authControllerProvider).value;
+                final myMember = membersAsync.value?.firstWhere(
+                  (m) => m.userId == user?.id,
+                  orElse: () => Member(id: -1, groupId: groupId, name: ''),
+                );
+                final myMemberId = myMember?.id;
+
+                final isPayer = item.payerId == myMemberId;
+                final isInvolved = item.splits.any(
+                  (s) => s.memberId == myMemberId,
+                );
+
+                Color amountColor;
+                if (isInvolved && !isPayer) {
+                  amountColor = Colors.red;
+                } else if (isPayer) {
+                  amountColor = Colors.green;
+                } else {
+                  amountColor = Theme.of(context).colorScheme.primary;
+                }
+
                 return ListTile(
                   leading: CircleAvatar(
                     backgroundColor: Theme.of(
                       context,
                     ).colorScheme.tertiaryContainer,
-                    child: const Icon(Icons.attach_money),
+                    child: Text(CurrencyUtils.getSymbol(groupCurrency)),
                   ),
-                  title: Text(item.description),
+                  title: Text(
+                    item.description,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Paid by ${item.payer?.name ?? 'Unknown'}'),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.secondaryContainer,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.outlineVariant,
+                              ),
+                            ),
+                            child: Text(
+                              'Paid by ${item.payer?.name ?? 'Unknown'}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSecondaryContainer,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                       // Show small avatars for splits
                       if (item.splits.isNotEmpty) ...[
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Row(
                           children: [
                             const Text(
@@ -154,7 +214,10 @@ class ExpensesListScreen extends ConsumerWidget {
                   ),
                   trailing: Text(
                     item.amount.toStringAsFixed(2),
-                    style: Theme.of(context).textTheme.titleMedium,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: amountColor,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   onTap: () => _showExpenseDetails(
                     context,
@@ -278,7 +341,7 @@ class ExpensesListScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '$groupCurrency ${expense.amount.toStringAsFixed(2)}',
+                    '${CurrencyUtils.getSymbol(groupCurrency)} ${expense.amount.toStringAsFixed(2)}',
                     style: Theme.of(context).textTheme.displaySmall?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: Theme.of(context).colorScheme.primary,
@@ -336,7 +399,7 @@ class ExpensesListScreen extends ConsumerWidget {
                             );
                             return Tooltip(
                               message:
-                                  '${memberValue.name}: $groupCurrency${split.amount.toStringAsFixed(2)}',
+                                  '${memberValue.name}: ${CurrencyUtils.getSymbol(groupCurrency)}${split.amount.toStringAsFixed(2)}',
                               child: Container(
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,

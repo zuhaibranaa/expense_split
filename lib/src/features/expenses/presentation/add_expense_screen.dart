@@ -6,6 +6,7 @@ import '../../people/data/members_repository.dart';
 import '../../people/domain/member_model.dart';
 import '../../auth/data/auth_repository.dart';
 import '../domain/expense_model.dart';
+import '../../../shared/utils/currency_utils.dart';
 
 enum SplitMethod { equal, exact }
 
@@ -169,7 +170,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 TextField(
                   controller: _amountController,
                   decoration: InputDecoration(
-                    labelText: 'Total Amount (${widget.groupCurrency})',
+                    labelText:
+                        'Total Amount (${CurrencyUtils.getSymbol(widget.groupCurrency)})',
                     prefixIcon: const Icon(Icons.attach_money),
                     helperText: 'Currency: ${widget.groupCurrency}',
                   ),
@@ -195,7 +197,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     var text = m.name;
                     if (m.userId ==
                         ref.read(authRepositoryProvider).currentUser?.id) {
-                      text = "Myself";
+                      text = "Me";
                     }
                     return DropdownMenuItem(value: m.id, child: Text(text));
                   }).toList(),
@@ -431,7 +433,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             Text('Split equally between $count people'),
             const SizedBox(height: 4),
             Text(
-              '${widget.groupCurrency} ${perPerson.toStringAsFixed(2)} / person',
+              '${CurrencyUtils.getSymbol(widget.groupCurrency)} ${perPerson.toStringAsFixed(2)} / person',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
@@ -573,7 +575,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                   controller: _splitControllers[member.id],
                   focusNode: _splitFocusNodes[member.id],
                   decoration: InputDecoration(
-                    prefixText: '${widget.groupCurrency} ',
+                    prefixText:
+                        '${CurrencyUtils.getSymbol(widget.groupCurrency)} ',
                     isDense: true,
                     contentPadding: const EdgeInsets.all(8),
                     border: const OutlineInputBorder(),
@@ -645,7 +648,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Splits sum (${widget.groupCurrency} $sumCheck) must equal Total (${widget.groupCurrency} $totalAmount)',
+              'Splits sum (${CurrencyUtils.getSymbol(widget.groupCurrency)} $sumCheck) must equal Total (${CurrencyUtils.getSymbol(widget.groupCurrency)} $totalAmount)',
             ),
           ),
         );

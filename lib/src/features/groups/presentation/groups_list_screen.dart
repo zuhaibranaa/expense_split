@@ -5,6 +5,7 @@ import 'join_group_dialog.dart';
 import 'create_group_dialog.dart';
 import '../data/groups_repository.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../../shared/utils/currency_utils.dart';
 
 class GroupsListScreen extends ConsumerWidget {
   const GroupsListScreen({super.key});
@@ -90,7 +91,7 @@ class GroupsListScreen extends ConsumerWidget {
                             ),
                             alignment: Alignment.center,
                             child: Text(
-                              group.currency,
+                              CurrencyUtils.getSymbol(group.currency),
                               style: TextStyle(
                                 color: Theme.of(context).colorScheme.primary,
                                 fontWeight: FontWeight.bold,

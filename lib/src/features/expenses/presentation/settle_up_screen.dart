@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/expenses_repository.dart';
 import '../../people/domain/member_model.dart';
 import 'package:intl/intl.dart';
+import '../../../shared/utils/currency_utils.dart';
 
 class SettleUpScreen extends ConsumerStatefulWidget {
   final int groupId;
@@ -140,7 +141,8 @@ class _SettleUpScreenState extends ConsumerState<SettleUpScreen> {
             TextField(
               controller: _amountController,
               decoration: InputDecoration(
-                labelText: 'Amount (${widget.groupCurrency})',
+                labelText:
+                    'Amount (${CurrencyUtils.getSymbol(widget.groupCurrency)})',
                 prefixIcon: const Icon(Icons.attach_money),
                 border: const OutlineInputBorder(),
                 helperText: 'Enter the amount paid',
