@@ -121,7 +121,7 @@ class ExpensesListScreen extends ConsumerWidget {
                     item.description,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: Colors.white,
                     ),
                   ),
                   subtitle: Column(
@@ -131,29 +131,22 @@ class ExpensesListScreen extends ConsumerWidget {
                       Row(
                         children: [
                           Container(
+                            margin: const EdgeInsets.only(right: 8),
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.secondaryContainer,
+                              color: Colors.blue.shade100,
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.outlineVariant,
-                              ),
+                              border: Border.all(color: Colors.blue.shade300),
                             ),
                             child: Text(
                               'Paid by ${item.payer?.name ?? 'Unknown'}',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSecondaryContainer,
+                                color: Colors.blue.shade800,
                               ),
                             ),
                           ),

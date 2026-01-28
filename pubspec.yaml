@@ -55,6 +55,7 @@ dependencies:
   web_socket_channel: ^3.0.0
   google_mobile_ads: ^7.0.0
   flutter_slidable: ^4.0.3
+  flutter_local_notifications: ^19.5.0
 
 dev_dependencies:
   flutter_test:
