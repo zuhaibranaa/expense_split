@@ -23,8 +23,9 @@ class _GroupStatsScreenState extends ConsumerState<GroupStatsScreen> {
   int _periodIndex = 2; // 0: Month, 1: Quarter, 2: Year
 
   List<Expense> _filterExpenses(List<Expense> expenses) {
-    if (_periodIndex == 2)
+    if (_periodIndex == 2) {
       return expenses; // Year (Show all for simplicity or current year)
+    }
 
     final now = DateTime.now();
     return expenses.where((e) {
