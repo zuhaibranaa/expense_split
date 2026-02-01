@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:equisplit/src/features/groups/data/groups_repository.dart';
 import 'package:equisplit/src/features/expenses/data/expenses_repository.dart';
@@ -181,31 +182,6 @@ class GlobalSettlementsScreen extends ConsumerWidget {
                                 ),
                               ),
                             ),
-                            if (!isOwesMe) // Only show settle button if I owe
-                              OutlinedButton.icon(
-                                onPressed: () async {
-                                  await Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (context) => SettleUpScreen(
-                                        groupId: item.groupId,
-                                        payer: item.me,
-                                        receiver: item.other,
-                                        amount: amount,
-                                        groupCurrency: item.groupCurrency,
-                                      ),
-                                    ),
-                                  );
-                                  // Refresh list
-                                  return ref.refresh(
-                                    globalSettlementsProvider.future,
-                                  );
-                                },
-                                icon: const Icon(Icons.payment, size: 16),
-                                label: const Text('Pay'),
-                                style: OutlinedButton.styleFrom(
-                                  visualDensity: VisualDensity.compact,
-                                ),
-                              ),
                           ],
                         ),
                         const SizedBox(height: 12),
@@ -243,6 +219,72 @@ class GlobalSettlementsScreen extends ConsumerWidget {
                             ),
                           ],
                         ),
+                        if (!isOwesMe) ...[
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              // Pay Button
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () async {
+                                    await Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (context) => SettleUpScreen(
+                                          groupId: item.groupId,
+                                          payer: item.me,
+                                          receiver: item.other,
+                                          amount: amount,
+                                          groupCurrency: item.groupCurrency,
+                                        ),
+                                      ),
+                                    );
+                                    // Refresh list
+                                    return ref.refresh(
+                                      globalSettlementsProvider.future,
+                                    );
+                                  },
+                                  icon: const Icon(Icons.payment, size: 16),
+                                  label: const Text('Pay'),
+                                  style: OutlinedButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                ),
+                              ),
+                              if (item.other.iban != null &&
+                                  item.other.iban!.isNotEmpty) ...[
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () {
+                                      Clipboard.setData(
+                                        ClipboardData(text: item.other.iban!),
+                                      );
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'IBAN copied to clipboard',
+                                          ),
+                                          duration: Duration(seconds: 2),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.copy, size: 16),
+                                    label: Text(
+                                      "IBAN",
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),

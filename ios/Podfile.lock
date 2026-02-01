@@ -10,8 +10,16 @@ PODS:
     - GoogleUtilities/UserDefaults (~> 8.0)
     - PromisesObjC (~> 2.4)
   - Flutter (1.0.0)
+  - flutter_local_notifications (0.0.1):
+    - Flutter
   - flutter_secure_storage (6.0.0):
     - Flutter
+  - Google-Mobile-Ads-SDK (12.14.0):
+    - GoogleUserMessagingPlatform (>= 1.1)
+  - google_mobile_ads (7.0.0):
+    - Flutter
+    - Google-Mobile-Ads-SDK (~> 12.14.0)
+    - webview_flutter_wkwebview
   - google_sign_in_ios (0.0.1):
     - Flutter
     - FlutterMacOS
@@ -22,6 +30,7 @@ PODS:
     - AppCheckCore (~> 11.0)
     - GTMAppAuth (~> 5.0)
     - GTMSessionFetcher/Core (~> 3.3)
+  - GoogleUserMessagingPlatform (3.1.0)
   - GoogleUtilities/Environment (8.1.0):
     - GoogleUtilities/Privacy
   - GoogleUtilities/Logger (8.1.0):
@@ -41,10 +50,18 @@ PODS:
     - GTMSessionFetcher/Core
   - image_picker_ios (0.0.1):
     - Flutter
+  - NWWebSocket (0.5.9)
   - path_provider_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
   - PromisesObjC (2.4.0)
+  - pusher_channels_flutter (0.0.1):
+    - Flutter
+    - PusherSwift (~> 10.1.5)
+  - PusherSwift (10.1.9):
+    - NWWebSocket (~> 0.5.9)
+    - PusherTweetNacl (~> 1.2.0)
+  - PusherTweetNacl (1.2.0)
   - shared_preferences_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
@@ -73,59 +90,88 @@ PODS:
     - sqlite3/perf-threadsafe
     - sqlite3/rtree
     - sqlite3/session
+  - webview_flutter_wkwebview (0.0.1):
+    - Flutter
+    - FlutterMacOS
 
 DEPENDENCIES:
   - Flutter (from `Flutter`)
+  - flutter_local_notifications (from `.symlinks/plugins/flutter_local_notifications/ios`)
   - flutter_secure_storage (from `.symlinks/plugins/flutter_secure_storage/ios`)
+  - google_mobile_ads (from `.symlinks/plugins/google_mobile_ads/ios`)
   - google_sign_in_ios (from `.symlinks/plugins/google_sign_in_ios/darwin`)
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
+  - pusher_channels_flutter (from `.symlinks/plugins/pusher_channels_flutter/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
   - sqlite3_flutter_libs (from `.symlinks/plugins/sqlite3_flutter_libs/darwin`)
+  - webview_flutter_wkwebview (from `.symlinks/plugins/webview_flutter_wkwebview/darwin`)
 
 SPEC REPOS:
   trunk:
     - AppAuth
     - AppCheckCore
+    - Google-Mobile-Ads-SDK
     - GoogleSignIn
+    - GoogleUserMessagingPlatform
     - GoogleUtilities
     - GTMAppAuth
     - GTMSessionFetcher
+    - NWWebSocket
     - PromisesObjC
+    - PusherSwift
+    - PusherTweetNacl
     - sqlite3
 
 EXTERNAL SOURCES:
   Flutter:
     :path: Flutter
+  flutter_local_notifications:
+    :path: ".symlinks/plugins/flutter_local_notifications/ios"
   flutter_secure_storage:
     :path: ".symlinks/plugins/flutter_secure_storage/ios"
+  google_mobile_ads:
+    :path: ".symlinks/plugins/google_mobile_ads/ios"
   google_sign_in_ios:
     :path: ".symlinks/plugins/google_sign_in_ios/darwin"
   image_picker_ios:
     :path: ".symlinks/plugins/image_picker_ios/ios"
   path_provider_foundation:
     :path: ".symlinks/plugins/path_provider_foundation/darwin"
+  pusher_channels_flutter:
+    :path: ".symlinks/plugins/pusher_channels_flutter/ios"
   shared_preferences_foundation:
     :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
   sqlite3_flutter_libs:
     :path: ".symlinks/plugins/sqlite3_flutter_libs/darwin"
+  webview_flutter_wkwebview:
+    :path: ".symlinks/plugins/webview_flutter_wkwebview/darwin"
 
 SPEC CHECKSUMS:
   AppAuth: 1c1a8afa7e12f2ec3a294d9882dfa5ab7d3cb063
   AppCheckCore: cc8fd0a3a230ddd401f326489c99990b013f0c4f
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
-  flutter_secure_storage: d33dac7ae2ea08509be337e775f6b59f1ff45f12
-  google_sign_in_ios: 055d43c4754f2860a53decd5133b78d05615fffd
+  flutter_local_notifications: a5a732f069baa862e728d839dd2ebb904737effb
+  flutter_secure_storage: 1ed9476fba7e7a782b22888f956cce43e2c62f13
+  Google-Mobile-Ads-SDK: 4534fd2dfcd3f705c5485a6633c5188d03d4eed2
+  google_mobile_ads: df3008bafbe1f2ad6862f87334e560d2f047f902
+  google_sign_in_ios: 00dfa94252eb10278b64828c81bcb7158a81a53a
   GoogleSignIn: c7f09cfbc85a1abf69187be091997c317cc33b77
+  GoogleUserMessagingPlatform: befe603da6501006420c206222acd449bba45a9c
   GoogleUtilities: 00c88b9a86066ef77f0da2fab05f65d7768ed8e1
   GTMAppAuth: 217a876b249c3c585a54fd6f73e6b58c4f5c4238
   GTMSessionFetcher: 5aea5ba6bd522a239e236100971f10cb71b96ab6
-  image_picker_ios: 4f2f91b01abdb52842a8e277617df877e40f905b
-  path_provider_foundation: 0b743cbb62d8e47eab856f09262bb8c1ddcfe6ba
+  image_picker_ios: e0ece4aa2a75771a7de3fa735d26d90817041326
+  NWWebSocket: 01dead025db38f26693d4fa0b4d5869c8013eae0
+  path_provider_foundation: bb55f6dbba17d0dccd6737fe6f7f34fbd0376880
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
-  shared_preferences_foundation: 5086985c1d43c5ba4d5e69a4e8083a389e2909e6
+  pusher_channels_flutter: 19ee24691d26965e9efca571f1620f536b9882bf
+  PusherSwift: 84a45a6b62c137c52ca948626817989d3127c022
+  PusherTweetNacl: 015f56f2cf010e718703f2bd9bca66fdcc91b208
+  shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
   sqlite3: 8d708bc63e9f4ce48f0ad9d6269e478c5ced1d9b
-  sqlite3_flutter_libs: c7b32a4d17d2cbad19895873ccc815f276b1f125
+  sqlite3_flutter_libs: d13b8b3003f18f596e542bcb9482d105577eff41
+  webview_flutter_wkwebview: 8ebf4fded22593026f7dbff1fbff31ea98573c8d
 
 PODFILE CHECKSUM: 3c63482e143d1b91d2d2560aee9fb04ecc74ac7e
 
