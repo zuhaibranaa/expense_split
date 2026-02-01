@@ -7,6 +7,7 @@ import '../../people/domain/member_model.dart';
 import '../../auth/data/auth_repository.dart';
 import '../domain/expense_model.dart';
 import '../../../shared/utils/currency_utils.dart';
+import 'package:equisplit/src/shared/presentation/widgets/user_avatar.dart';
 
 enum SplitMethod { equal, exact }
 
@@ -373,17 +374,10 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     ...members.map((m) {
                       return CheckboxListTile(
                         title: Text(m.name),
-                        secondary: CircleAvatar(
-                          backgroundImage: m.avatarUrl != null
-                              ? NetworkImage(m.avatarUrl!)
-                              : null,
-                          child: m.avatarUrl == null
-                              ? Text(
-                                  m.name.isNotEmpty
-                                      ? m.name[0].toUpperCase()
-                                      : '?',
-                                )
-                              : null,
+                        secondary: UserAvatar(
+                          radius: 20,
+                          avatarUrl: m.avatarUrl,
+                          name: m.name,
                         ),
                         value: _selectedMemberIds.contains(m.id),
                         onChanged: (bool? value) {

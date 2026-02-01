@@ -5,6 +5,7 @@ import '../data/auth_repository.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:image_picker/image_picker.dart';
+import 'package:equisplit/src/shared/presentation/widgets/user_avatar.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -27,22 +28,12 @@ class ProfileScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(16),
               children: [
                 Center(
-                  child: GestureDetector(
+                  child: UserAvatar(
+                    radius: 50,
+                    avatarUrl: user.avatarUrl,
+                    name: user.name,
                     onTap: () =>
                         _showAvatarOptions(context, ref, user.avatarUrl),
-                    child: CircleAvatar(
-                      radius: 50,
-                      backgroundImage: user.avatarUrl != null
-                          ? NetworkImage(user.avatarUrl!)
-                          : null,
-                      // Add an edit icon overlay if you want, but simple tap is fine for now
-                      child: user.avatarUrl == null
-                          ? Text(
-                              user.name[0],
-                              style: const TextStyle(fontSize: 32),
-                            )
-                          : null,
-                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -212,6 +203,19 @@ class ProfileScreen extends ConsumerWidget {
                 }
               },
             ),
+            if (currentUrl != null)
+              ListTile(
+                leading: const Icon(Icons.visibility),
+                title: const Text('View Image'),
+                onTap: () {
+                  Navigator.pop(context);
+                  UserAvatar.showImageView(
+                    context,
+                    currentUrl,
+                    "Profile Image",
+                  );
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.link),
               title: const Text('Enter URL'),

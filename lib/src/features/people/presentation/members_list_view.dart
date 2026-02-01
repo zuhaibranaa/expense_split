@@ -7,6 +7,7 @@ import '../../auth/data/auth_repository.dart';
 import '../data/members_repository.dart';
 import '../../people/domain/member_model.dart';
 import 'member_profile_screen.dart';
+import 'package:equisplit/src/shared/presentation/widgets/user_avatar.dart';
 
 class MembersListView extends ConsumerWidget {
   final int groupId;
@@ -119,13 +120,10 @@ class MembersListView extends ConsumerWidget {
 
   Widget _buildMemberTile(BuildContext context, WidgetRef ref, Member member) {
     return ListTile(
-      leading: CircleAvatar(
-        backgroundImage: member.avatarUrl != null
-            ? NetworkImage(member.avatarUrl!)
-            : null,
-        child: member.avatarUrl == null
-            ? Text(member.name.isNotEmpty ? member.name[0].toUpperCase() : '?')
-            : null,
+      leading: UserAvatar(
+        radius: 20,
+        avatarUrl: member.avatarUrl,
+        name: member.name,
       ),
       title: Text(member.name),
       subtitle: Row(

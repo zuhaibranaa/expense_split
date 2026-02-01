@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../people/domain/member_model.dart';
 
+import 'package:equisplit/src/shared/presentation/widgets/user_avatar.dart';
+
 class MemberProfileScreen extends StatelessWidget {
   final Member member;
   const MemberProfileScreen({super.key, required this.member});
@@ -14,19 +16,10 @@ class MemberProfileScreen extends StatelessWidget {
         child: Column(
           children: [
             Center(
-              child: CircleAvatar(
+              child: UserAvatar(
                 radius: 50,
-                backgroundImage: member.avatarUrl != null
-                    ? NetworkImage(member.avatarUrl!)
-                    : null,
-                child: member.avatarUrl == null
-                    ? Text(
-                        member.name.isNotEmpty
-                            ? member.name[0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(fontSize: 32),
-                      )
-                    : null,
+                avatarUrl: member.avatarUrl,
+                name: member.name,
               ),
             ),
             const SizedBox(height: 16),

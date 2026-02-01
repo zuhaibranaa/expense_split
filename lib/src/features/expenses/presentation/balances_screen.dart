@@ -6,6 +6,7 @@ import '../../people/data/members_repository.dart';
 import '../../people/domain/member_model.dart';
 import 'settle_up_screen.dart';
 import '../../../shared/utils/currency_utils.dart';
+import 'package:equisplit/src/shared/presentation/widgets/user_avatar.dart';
 
 class BalancesScreen extends ConsumerWidget {
   final int groupId;
@@ -118,21 +119,10 @@ class BalancesScreen extends ConsumerWidget {
                                 children: [
                                   Row(
                                     children: [
-                                      CircleAvatar(
-                                        backgroundImage:
-                                            fromMember.avatarUrl != null
-                                            ? NetworkImage(
-                                                fromMember.avatarUrl!,
-                                              )
-                                            : null,
-                                        child: fromMember.avatarUrl == null
-                                            ? Text(
-                                                fromMember.name.isNotEmpty
-                                                    ? fromMember.name[0]
-                                                          .toUpperCase()
-                                                    : '?',
-                                              )
-                                            : null,
+                                      UserAvatar(
+                                        radius: 20,
+                                        avatarUrl: fromMember.avatarUrl,
+                                        name: fromMember.name,
                                       ),
                                       const Padding(
                                         padding: EdgeInsets.symmetric(
@@ -143,19 +133,10 @@ class BalancesScreen extends ConsumerWidget {
                                           color: Colors.grey,
                                         ),
                                       ),
-                                      CircleAvatar(
-                                        backgroundImage:
-                                            toMember.avatarUrl != null
-                                            ? NetworkImage(toMember.avatarUrl!)
-                                            : null,
-                                        child: toMember.avatarUrl == null
-                                            ? Text(
-                                                toMember.name.isNotEmpty
-                                                    ? toMember.name[0]
-                                                          .toUpperCase()
-                                                    : '?',
-                                              )
-                                            : null,
+                                      UserAvatar(
+                                        radius: 20,
+                                        avatarUrl: toMember.avatarUrl,
+                                        name: toMember.name,
                                       ),
                                       const SizedBox(width: 16),
                                       Expanded(

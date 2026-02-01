@@ -10,6 +10,7 @@ import '../../groups/data/groups_repository.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../../shared/utils/currency_utils.dart';
 import 'add_expense_screen.dart';
+import 'package:equisplit/src/shared/presentation/widgets/user_avatar.dart';
 
 class ExpensesListScreen extends ConsumerWidget {
   final int groupId;
@@ -180,21 +181,10 @@ class ExpensesListScreen extends ConsumerWidget {
                                     padding: const EdgeInsets.only(right: 2.0),
                                     child: Tooltip(
                                       message: member.name,
-                                      child: CircleAvatar(
+                                      child: UserAvatar(
                                         radius: 8,
-                                        backgroundImage:
-                                            member.avatarUrl != null
-                                            ? NetworkImage(member.avatarUrl!)
-                                            : null,
-                                        backgroundColor: Colors.grey.shade300,
-                                        child: member.avatarUrl == null
-                                            ? Text(
-                                                member.name[0],
-                                                style: const TextStyle(
-                                                  fontSize: 8,
-                                                ),
-                                              )
-                                            : null,
+                                        avatarUrl: member.avatarUrl,
+                                        name: member.name,
                                       ),
                                     ),
                                   );
@@ -563,20 +553,6 @@ class ExpensesListScreen extends ConsumerWidget {
   }
 
   Widget _buildAvatar(String? name, String? avatarUrl, {double radius = 16}) {
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: Colors.grey.shade200,
-      backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-      child: avatarUrl == null
-          ? Text(
-              name != null && name.isNotEmpty ? name[0].toUpperCase() : '?',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: radius * 0.9,
-                color: Colors.black87,
-              ),
-            )
-          : null,
-    );
+    return UserAvatar(radius: radius, avatarUrl: avatarUrl, name: name ?? '?');
   }
 }
