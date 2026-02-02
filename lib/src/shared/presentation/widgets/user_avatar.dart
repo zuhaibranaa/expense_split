@@ -5,6 +5,7 @@ class UserAvatar extends StatelessWidget {
   final String name;
   final double radius;
   final VoidCallback? onTap;
+  final Object? heroTag;
 
   const UserAvatar({
     super.key,
@@ -12,20 +13,23 @@ class UserAvatar extends StatelessWidget {
     required this.name,
     this.radius = 20,
     this.onTap,
+    this.heroTag,
   });
 
   @override
   Widget build(BuildContext context) {
+    final Object finalHeroTag = heroTag ?? 'avatar_${avatarUrl ?? name}';
+
     return GestureDetector(
       onTap:
           onTap ??
           () {
             if (avatarUrl != null) {
-              showImageView(context, avatarUrl!, name);
+              showImageView(context, avatarUrl!, name, finalHeroTag);
             }
           },
       child: Hero(
-        tag: 'avatar_${avatarUrl ?? name}',
+        tag: finalHeroTag,
         child: CircleAvatar(
           radius: radius,
           backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl!) : null,
@@ -44,13 +48,18 @@ class UserAvatar extends StatelessWidget {
     BuildContext context,
     String avatarUrl,
     String name,
+    Object heroTag,
   ) {
     Navigator.of(context).push(
       PageRouteBuilder(
         opaque: false,
         barrierDismissible: true,
         pageBuilder: (BuildContext context, animation, secondaryAnimation) {
-          return _ZoomableAvatarView(avatarUrl: avatarUrl, name: name);
+          return _ZoomableAvatarView(
+            avatarUrl: avatarUrl,
+            name: name,
+            heroTag: heroTag,
+          );
         },
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
@@ -63,8 +72,13 @@ class UserAvatar extends StatelessWidget {
 class _ZoomableAvatarView extends StatefulWidget {
   final String avatarUrl;
   final String name;
+  final Object heroTag;
 
-  const _ZoomableAvatarView({required this.avatarUrl, required this.name});
+  const _ZoomableAvatarView({
+    required this.avatarUrl,
+    required this.name,
+    required this.heroTag,
+  });
 
   @override
   State<_ZoomableAvatarView> createState() => _ZoomableAvatarViewState();
@@ -134,7 +148,6 @@ class _ZoomableAvatarViewState extends State<_ZoomableAvatarView> {
 
     final double opacity = (1.0 - dragRatio).clamp(0.0, 1.0);
     final double displayScale = 1.0 - (dragRatio * 0.2);
-    final double borderRadius = dragRatio * 100.0; // Animate to circle-ish
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -153,17 +166,19 @@ class _ZoomableAvatarViewState extends State<_ZoomableAvatarView> {
                   scale: displayScale,
                   child: Center(
                     child: Hero(
-                      tag: 'avatar_${widget.avatarUrl}',
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(borderRadius),
+                      tag: widget.heroTag,
+                      child: ClipOval(
                         child: InteractiveViewer(
                           transformationController: _transformationController,
                           panEnabled: isZoomed,
                           minScale: 1.0,
                           maxScale: 4.0,
-                          child: Image.network(
-                            widget.avatarUrl,
-                            fit: BoxFit.contain,
+                          child: AspectRatio(
+                            aspectRatio: 1,
+                            child: Image.network(
+                              widget.avatarUrl,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
                       ),

@@ -187,6 +187,8 @@ class ExpensesListScreen extends ConsumerWidget {
                                         radius: 8,
                                         avatarUrl: member.avatarUrl,
                                         name: member.name,
+                                        heroTag:
+                                            'expense_${item.id}_split_list_${member.id}',
                                       ),
                                     ),
                                   );
@@ -376,6 +378,8 @@ class ExpensesListScreen extends ConsumerWidget {
                                   member.name,
                                   member.avatarUrl,
                                   radius: 18,
+                                  heroTag:
+                                      'expense_${expense.id}_payment_detail_${member.id}',
                                 ),
                               ),
                             );
@@ -384,9 +388,29 @@ class ExpensesListScreen extends ConsumerWidget {
                       else
                         _buildPersonCard(
                           context,
-                          expense.payer?.name ?? 'Unknown',
-                          null, // Payer avatar URL not strictly in model yet or needs lookup
+                          members
+                              .firstWhere(
+                                (m) => m.id == expense.payerId,
+                                orElse: () => Member(
+                                  id: -1,
+                                  groupId: -1,
+                                  name: expense.payer?.name ?? 'Unknown',
+                                ),
+                              )
+                              .name,
+                          members
+                              .firstWhere(
+                                (m) => m.id == expense.payerId,
+                                orElse: () => Member(
+                                  id: -1,
+                                  groupId: -1,
+                                  name: expense.payer?.name ?? 'Unknown',
+                                ),
+                              )
+                              .avatarUrl,
                           isPayer: true,
+                          heroTag:
+                              'expense_${expense.id}_payer_detail_${expense.payerId}',
                         ),
                     ],
                   ),
@@ -432,6 +456,8 @@ class ExpensesListScreen extends ConsumerWidget {
                                   memberValue.name,
                                   memberValue.avatarUrl,
                                   radius: 18,
+                                  heroTag:
+                                      'expense_${expense.id}_split_detail_${memberValue.id}',
                                 ),
                               ),
                             );
@@ -561,6 +587,7 @@ class ExpensesListScreen extends ConsumerWidget {
     String name,
     String? avatarUrl, {
     bool isPayer = false,
+    Object? heroTag,
   }) {
     return Container(
       padding: const EdgeInsets.all(8),
@@ -571,7 +598,7 @@ class ExpensesListScreen extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildAvatar(name, avatarUrl, radius: 20),
+          _buildAvatar(name, avatarUrl, radius: 20, heroTag: heroTag),
           const SizedBox(width: 12),
           Flexible(
             child: Text(
@@ -587,7 +614,17 @@ class ExpensesListScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildAvatar(String? name, String? avatarUrl, {double radius = 16}) {
-    return UserAvatar(radius: radius, avatarUrl: avatarUrl, name: name ?? '?');
+  Widget _buildAvatar(
+    String? name,
+    String? avatarUrl, {
+    double radius = 16,
+    Object? heroTag,
+  }) {
+    return UserAvatar(
+      radius: radius,
+      avatarUrl: avatarUrl,
+      name: name ?? '?',
+      heroTag: heroTag,
+    );
   }
 }

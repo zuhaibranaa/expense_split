@@ -29,6 +29,7 @@ class ProfileScreen extends ConsumerWidget {
               children: [
                 Center(
                   child: UserAvatar(
+                    heroTag: 'profile_screen_avatar',
                     radius: 50,
                     avatarUrl: user.avatarUrl,
                     name: user.name,
@@ -213,6 +214,7 @@ class ProfileScreen extends ConsumerWidget {
                     context,
                     currentUrl,
                     "Profile Image",
+                    'profile_screen_avatar',
                   );
                 },
               ),
