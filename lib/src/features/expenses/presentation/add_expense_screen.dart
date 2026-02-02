@@ -32,6 +32,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   final _descriptionController = TextEditingController();
   final _amountController = TextEditingController();
   int? _selectedPayerId;
+  bool _isMultiplePayers = false;
+  final Map<int, TextEditingController> _payerControllers = {};
+  final Set<int> _selectedPayerIds = {};
   String _selectedCategory = 'General';
 
   final Set<int> _selectedMemberIds = {};
@@ -56,6 +59,24 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           widget.expense!.splits.map((s) => s.memberId),
         );
       }
+
+      // Initialize payers
+      if (widget.expense!.payments.length > 1) {
+        _isMultiplePayers = true;
+        for (var p in widget.expense!.payments) {
+          _selectedPayerIds.add(p.memberId);
+          _payerControllers[p.memberId] = TextEditingController(
+            text: p.amount.toString(),
+          );
+          _payerControllers[p.memberId]!.addListener(_onPaymentAmountChanged);
+        }
+      } else if (widget.expense!.payments.isNotEmpty) {
+        // Single payer from payments list
+        _selectedPayerId = widget.expense!.payments.first.memberId;
+      }
+
+      // Init Listeners
+      _initPaymentListeners();
     }
     if (_isInit) {
       _loadAd();
@@ -69,6 +90,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     _descriptionController.dispose();
     _amountController.dispose();
     for (var c in _splitControllers.values) {
+      c.dispose();
+    }
+    for (var c in _payerControllers.values) {
       c.dispose();
     }
     for (var f in _splitFocusNodes.values) {
@@ -180,32 +204,132 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     decimal: true,
                   ),
                   onChanged: (val) {
-                    setState(
-                      () {},
-                    ); // Rebuild to update exact/equal calculations if needed
+                    _onTotalAmountChanged(members);
+                    setState(() {});
                   },
                 ),
                 const SizedBox(height: 16),
 
                 // Payer
-                DropdownButtonFormField<int>(
-                  initialValue: _selectedPayerId,
-                  decoration: const InputDecoration(
-                    labelText: 'Paid By',
-                    prefixIcon: Icon(Icons.person),
+                if (!_isMultiplePayers)
+                  DropdownButtonFormField<int>(
+                    initialValue: _selectedPayerId,
+                    decoration: const InputDecoration(
+                      labelText: 'Paid By',
+                      prefixIcon: Icon(Icons.person),
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: -1,
+                        child: Text("Multiple people"),
+                      ),
+                      ...members.map((m) {
+                        var text = m.name;
+                        if (m.userId ==
+                            ref.read(authRepositoryProvider).currentUser?.id) {
+                          text = "Me";
+                        }
+                        return DropdownMenuItem(value: m.id, child: Text(text));
+                      }),
+                    ],
+                    onChanged: (val) {
+                      if (val == -1) {
+                        setState(() {
+                          _isMultiplePayers = true;
+                          // Initialize selected payers (default to none or handle in dialog)
+                          // If current user is present, maybe select them?
+                          final currentUser = ref
+                              .read(authRepositoryProvider)
+                              .currentUser;
+                          final myMember = members
+                              .where((m) => m.userId == currentUser?.id)
+                              .firstOrNull;
+                          if (myMember != null) {
+                            _selectedPayerIds.add(myMember.id);
+                          }
+
+                          // Initialize controllers for ALL members just in case, but only show selected
+                          // Initialize controllers for ALL members just in case, but only show selected
+                          for (var m in members) {
+                            _getOrCreatePayerController(m.id);
+                          }
+
+                          // Auto open dialog
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            _showPayerSelectionDialog(members);
+                          });
+                        });
+                      } else {
+                        setState(() => _selectedPayerId = val);
+                      }
+                    },
                   ),
-                  items: members.map((m) {
-                    var text = m.name;
-                    if (m.userId ==
-                        ref.read(authRepositoryProvider).currentUser?.id) {
-                      text = "Me";
-                    }
-                    return DropdownMenuItem(value: m.id, child: Text(text));
-                  }).toList(),
-                  onChanged: (val) {
-                    setState(() => _selectedPayerId = val);
-                  },
-                ),
+
+                if (_isMultiplePayers) ...[
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Paid by multiple people'),
+                    subtitle: Text(
+                      _selectedPayerIds.length == members.length
+                          ? 'All (${members.length})'
+                          : '${_selectedPayerIds.length} people selected',
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _isMultiplePayers = false;
+                              _selectedPayerId = members.first.id;
+                              _selectedPayerIds.clear();
+                            });
+                          },
+                          child: const Text("Reset"),
+                        ),
+                        const Icon(Icons.arrow_forward_ios, size: 16),
+                      ],
+                    ),
+                    onTap: () => _showPayerSelectionDialog(members),
+                  ),
+
+                  ...members.where((m) => _selectedPayerIds.contains(m.id)).map((
+                    m,
+                  ) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          UserAvatar(
+                            avatarUrl: m.avatarUrl,
+                            name: m.name,
+                            radius: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(m.name)),
+                          SizedBox(
+                            width: 100,
+                            child: TextField(
+                              controller: _getOrCreatePayerController(m.id),
+                              decoration: InputDecoration(
+                                prefixText:
+                                    '${CurrencyUtils.getSymbol(widget.groupCurrency)} ',
+                                isDense: true,
+                                contentPadding: const EdgeInsets.all(8),
+                                border: const OutlineInputBorder(),
+                              ),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 16),
+                ],
                 const SizedBox(height: 16),
 
                 // Category
@@ -414,6 +538,71 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     );
   }
 
+  Future<void> _showPayerSelectionDialog(List<Member> members) async {
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final allSelected = _selectedPayerIds.length == members.length;
+
+            return AlertDialog(
+              title: const Text('Paid by'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CheckboxListTile(
+                      title: _buildMemberStack(members),
+                      value: allSelected,
+                      onChanged: (bool? value) {
+                        setState(() {
+                          if (value == true) {
+                            _selectedPayerIds.addAll(members.map((m) => m.id));
+                          } else {
+                            _selectedPayerIds.clear();
+                          }
+                        });
+                        this.setState(() {});
+                      },
+                    ),
+                    ...members.map((m) {
+                      return CheckboxListTile(
+                        title: Text(m.name),
+                        secondary: UserAvatar(
+                          radius: 20,
+                          avatarUrl: m.avatarUrl,
+                          name: m.name,
+                        ),
+                        value: _selectedPayerIds.contains(m.id),
+                        onChanged: (bool? value) {
+                          setState(() {
+                            if (value == true) {
+                              _selectedPayerIds.add(m.id);
+                            } else {
+                              _selectedPayerIds.remove(m.id);
+                            }
+                          });
+                          this.setState(() {});
+                        },
+                      );
+                    }),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Done'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildEqualSplitView(List<Member> members) {
     final totalAmount = double.tryParse(_amountController.text) ?? 0.0;
     final count = _selectedMemberIds.length;
@@ -524,6 +713,67 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     }
   }
 
+  void _initPaymentListeners() {
+    // Logic moved to _getOrCreatePayerController to ensure listeners are added on creation
+  }
+
+  void _onTotalAmountChanged(List<Member> members) {
+    if (_isProgrammaticUpdate) return;
+
+    if (_isMultiplePayers && _selectedPayerIds.isNotEmpty) {
+      final total = double.tryParse(_amountController.text) ?? 0.0;
+      final count = _selectedPayerIds.length;
+      if (count > 0 && total > 0) {
+        final share = (total / count * 100).floor() / 100.0;
+        final remainder = total - (share * count);
+
+        _isProgrammaticUpdate = true;
+
+        int i = 0;
+        for (var id in _selectedPayerIds) {
+          double amount = share;
+          if (i < (remainder * 100).round()) {
+            amount += 0.01;
+          }
+
+          if (!_payerControllers.containsKey(id)) {
+            _payerControllers[id] = TextEditingController(text: "0.00");
+            _payerControllers[id]!.addListener(_onPaymentAmountChanged);
+          }
+
+          _payerControllers[id]!.text = amount.toStringAsFixed(2);
+          i++;
+        }
+        _isProgrammaticUpdate = false;
+      }
+    }
+  }
+
+  void _onPaymentAmountChanged() {
+    if (_isProgrammaticUpdate) return;
+    if (!_isMultiplePayers) return;
+
+    double sum = 0.0;
+    for (var id in _selectedPayerIds) {
+      sum += double.tryParse(_payerControllers[id]?.text ?? "0") ?? 0.0;
+    }
+
+    _isProgrammaticUpdate = true;
+    _amountController.text = sum.toStringAsFixed(2);
+    _isProgrammaticUpdate = false;
+
+    setState(() {});
+  }
+
+  TextEditingController _getOrCreatePayerController(int memberId) {
+    if (!_payerControllers.containsKey(memberId)) {
+      final c = TextEditingController(text: '0.00');
+      c.addListener(_onPaymentAmountChanged);
+      _payerControllers[memberId] = c;
+    }
+    return _payerControllers[memberId]!;
+  }
+
   Widget _buildExactSplitView(List<Member> members) {
     // Ensure controllers and focus nodes exist and have listeners
     for (var m in members) {
@@ -594,15 +844,19 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     final desc = _descriptionController.text.trim();
     final totalAmount = double.tryParse(_amountController.text);
 
-    if (desc.isEmpty ||
-        totalAmount == null ||
-        totalAmount <= 0 ||
-        _selectedPayerId == null) {
+    if (desc.isEmpty || totalAmount == null || totalAmount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please fill in valid description and amount'),
         ),
       );
+      return;
+    }
+
+    if (!_isMultiplePayers && _selectedPayerId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select a payer')));
       return;
     }
 
@@ -618,6 +872,50 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         ),
       );
       return;
+    }
+
+    // Calculate Payments
+    Map<int, double>? payments;
+    int? finalPayerId = _selectedPayerId;
+
+    if (_isMultiplePayers) {
+      double paymentsSum = 0.0;
+      final Map<int, double> tempPayments = {};
+
+      for (var m in members) {
+        if (!_selectedPayerIds.contains(m.id)) continue;
+
+        final val =
+            double.tryParse(_payerControllers[m.id]?.text ?? '0') ?? 0.0;
+        if (val > 0) {
+          tempPayments[m.id] = val;
+          paymentsSum += val;
+        }
+      }
+
+      if ((paymentsSum - totalAmount).abs() > 0.05) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Payments sum (${CurrencyUtils.getSymbol(widget.groupCurrency)} $paymentsSum) must equal Total (${CurrencyUtils.getSymbol(widget.groupCurrency)} $totalAmount)',
+            ),
+          ),
+        );
+        return;
+      }
+
+      if (tempPayments.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter at least one payment')),
+        );
+        return;
+      }
+
+      payments = tempPayments;
+      // For backward compatibility, set payerId to the person who paid the most or first
+      // It's required by the API locally, though backend might ignore it if payments are present?
+      // Let's set it to the first payer for safety.
+      finalPayerId = tempPayments.keys.first;
     }
 
     // Calculate Splits
@@ -659,10 +957,11 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             .createExpense(
               description: desc,
               amount: totalAmount,
-              payerId: _selectedPayerId!,
+              payerId: finalPayerId!,
               category: _selectedCategory,
               date: DateTime.now(),
               splits: splits,
+              payments: payments,
             );
         if (_interstitialAd != null) {
           _interstitialAd!.show();
@@ -679,10 +978,11 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 userId: user.id,
                 description: desc,
                 amount: totalAmount,
-                payerId: _selectedPayerId!,
+                payerId: finalPayerId!,
                 category: _selectedCategory,
                 date: widget.expense!.date,
                 splits: splits,
+                payments: payments,
               );
         }
         if (navigator.mounted) navigator.pop();

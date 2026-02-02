@@ -16,11 +16,19 @@ class ExpensesRepository {
     required String category,
     required DateTime date,
     required Map<int, double> splits,
+    Map<int, double>? payments,
     bool isSettlement = false,
   }) async {
     final splitsList = splits.entries
         .map((e) => {'member_id': e.key, 'amount': e.value})
         .toList();
+
+    List<Map<String, dynamic>>? paymentsList;
+    if (payments != null) {
+      paymentsList = payments.entries
+          .map((e) => {'member_id': e.key, 'amount': e.value})
+          .toList();
+    }
 
     await _api.post('/groups/$groupId/expenses/', {
       'description': description,
@@ -30,6 +38,7 @@ class ExpensesRepository {
       'date': date.toIso8601String(),
       'is_settlement': isSettlement,
       'splits': splitsList,
+      if (paymentsList != null) 'payments': paymentsList,
     });
   }
 
@@ -48,10 +57,18 @@ class ExpensesRepository {
     required String category,
     required DateTime date,
     required Map<int, double> splits,
+    Map<int, double>? payments,
   }) async {
     final splitsList = splits.entries
         .map((e) => {'member_id': e.key, 'amount': e.value})
         .toList();
+
+    List<Map<String, dynamic>>? paymentsList;
+    if (payments != null) {
+      paymentsList = payments.entries
+          .map((e) => {'member_id': e.key, 'amount': e.value})
+          .toList();
+    }
 
     await _api.put('/expenses/$expenseId?user_id=$userId', {
       'description': description,
@@ -60,6 +77,7 @@ class ExpensesRepository {
       'category': category,
       'date': date.toIso8601String(),
       'splits': splitsList,
+      if (paymentsList != null) 'payments': paymentsList,
     });
   }
 
@@ -91,6 +109,7 @@ class ExpensesNotifier
     required String category,
     required DateTime date,
     required Map<int, double> splits,
+    Map<int, double>? payments,
     bool isSettlement = false,
   }) async {
     final repo = ref.read(expensesRepositoryProvider);
@@ -105,6 +124,7 @@ class ExpensesNotifier
         category: category,
         date: date,
         splits: splits,
+        payments: payments,
         isSettlement: isSettlement,
       );
       return repo.getExpenses(arg);
@@ -120,6 +140,7 @@ class ExpensesNotifier
     required String category,
     required DateTime date,
     required Map<int, double> splits,
+    Map<int, double>? payments,
   }) async {
     final repo = ref.read(expensesRepositoryProvider);
     // Optimistic Update (Complex due to splits, but we can try basic fields if needed)
@@ -137,6 +158,7 @@ class ExpensesNotifier
         category: category,
         date: date,
         splits: splits,
+        payments: payments,
       );
       // Refetch to get consistent state
       state = await AsyncValue.guard(() => repo.getExpenses(arg));

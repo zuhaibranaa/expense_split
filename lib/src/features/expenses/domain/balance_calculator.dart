@@ -32,9 +32,17 @@ class BalanceCalculator {
     }
 
     for (var expense in expenses) {
-      // Payer gets + amount
-      balances[expense.payerId] =
-          (balances[expense.payerId] ?? 0) + expense.amount;
+      if (expense.payments.isNotEmpty) {
+        // Multiple Payers (or single via payments list)
+        for (var payment in expense.payments) {
+          balances[payment.memberId] =
+              (balances[payment.memberId] ?? 0) + payment.amount;
+        }
+      } else {
+        // Legacy/Fallback
+        balances[expense.payerId] =
+            (balances[expense.payerId] ?? 0) + expense.amount;
+      }
 
       // Splitters get - split_amount
       for (var split in expense.splits) {
@@ -103,14 +111,42 @@ class BalanceCalculator {
 
     // 1. Accumulate all debts
     for (var expense in expenses) {
-      final payerId = expense.payerId;
-      for (var split in expense.splits) {
-        if (split.memberId == payerId) continue; // Skip self-debt
+      if (expense.payments.isNotEmpty) {
+        final totalAmount = expense.amount;
+        // Avoid division by zero
+        if (totalAmount <= 0) continue;
 
-        // User (split.memberId) owes Payer (payerId)
-        debts.putIfAbsent(split.memberId, () => {});
-        final currentDebt = debts[split.memberId]![payerId] ?? 0.0;
-        debts[split.memberId]![payerId] = currentDebt + split.amount;
+        for (var split in expense.splits) {
+          for (var payment in expense.payments) {
+            if (split.memberId == payment.memberId) {
+              // Self-debt for this portion?
+              // Actually, if I paid 50 and owe 50, I owe myself 0.
+              // But simplified: Net effect is calculated.
+              // For direct debts: I owe Payer X my share of what they paid.
+              // My Share of what X paid = (MySplit / Total) * X_Payment
+              continue;
+            }
+
+            final owedToPayer = (split.amount / totalAmount) * payment.amount;
+
+            // User (split.memberId) owes Payer (payment.memberId)
+            debts.putIfAbsent(split.memberId, () => {});
+            final currentDebt = debts[split.memberId]![payment.memberId] ?? 0.0;
+            debts[split.memberId]![payment.memberId] =
+                currentDebt + owedToPayer;
+          }
+        }
+      } else {
+        // Legacy Logic
+        final payerId = expense.payerId;
+        for (var split in expense.splits) {
+          if (split.memberId == payerId) continue; // Skip self-debt
+
+          // User (split.memberId) owes Payer (payerId)
+          debts.putIfAbsent(split.memberId, () => {});
+          final currentDebt = debts[split.memberId]![payerId] ?? 0.0;
+          debts[split.memberId]![payerId] = currentDebt + split.amount;
+        }
       }
     }
 

@@ -143,7 +143,9 @@ class ExpensesListScreen extends ConsumerWidget {
                               border: Border.all(color: Colors.blue.shade300),
                             ),
                             child: Text(
-                              'Paid by ${item.payer?.name ?? 'Unknown'}',
+                              (item.payments.length > 1)
+                                  ? 'Paid by ${item.payments.length} people'
+                                  : 'Paid by ${item.payer?.name ?? 'Unknown'}',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
@@ -287,7 +289,7 @@ class ExpensesListScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        DateFormat.yMMMd().format(expense.date),
+                        DateFormat.yMMMd().add_jm().format(expense.date),
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
@@ -347,12 +349,45 @@ class ExpensesListScreen extends ConsumerWidget {
                     children: [
                       _buildSectionLabel(context, 'PAID BY'),
                       const SizedBox(height: 12),
-                      _buildPersonCard(
-                        context,
-                        expense.payer?.name ?? 'Unknown',
-                        null, // Payer avatar URL not strictly in model yet or needs lookup
-                        isPayer: true,
-                      ),
+                      if (expense.payments.length > 1)
+                        Wrap(
+                          spacing: -8,
+                          runSpacing: 8,
+                          children: expense.payments.map((p) {
+                            final member = members.firstWhere(
+                              (m) => m.id == p.memberId,
+                              orElse: () =>
+                                  Member(id: -1, groupId: -1, name: 'Unknown'),
+                            );
+                            return Tooltip(
+                              message:
+                                  '${member.name}: ${CurrencyUtils.getSymbol(groupCurrency)}${p.amount.toStringAsFixed(2)}',
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.surface,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: _buildAvatar(
+                                  member.name,
+                                  member.avatarUrl,
+                                  radius: 18,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        )
+                      else
+                        _buildPersonCard(
+                          context,
+                          expense.payer?.name ?? 'Unknown',
+                          null, // Payer avatar URL not strictly in model yet or needs lookup
+                          isPayer: true,
+                        ),
                     ],
                   ),
                 ),
