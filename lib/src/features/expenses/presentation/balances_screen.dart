@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/balance_calculator.dart';
 import '../data/expenses_repository.dart';
 import '../../people/data/members_repository.dart';
+import '../../groups/data/groups_repository.dart';
 import '../../people/domain/member_model.dart';
 import 'settle_up_screen.dart';
 import '../../../shared/utils/currency_utils.dart';
@@ -21,7 +22,7 @@ class BalancesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final balancesAsync = ref.watch(balancesProvider(groupId));
-    final membersAsync = ref.watch(membersFutureProvider(groupId));
+    final membersAsync = ref.watch(allMembersFutureProvider(groupId));
 
     return Scaffold(
       body: balancesAsync.when(
@@ -33,7 +34,7 @@ class BalancesScreen extends ConsumerWidget {
                   expensesFutureProvider(groupId).future,
                 );
                 final future2 = ref.refresh(
-                  membersFutureProvider(groupId).future,
+                  allMembersFutureProvider(groupId).future,
                 );
                 await Future.wait([future1, future2]);
               },
@@ -57,7 +58,7 @@ class BalancesScreen extends ConsumerWidget {
                     expensesFutureProvider(groupId).future,
                   );
                   final future2 = ref.refresh(
-                    membersFutureProvider(groupId).future,
+                    allMembersFutureProvider(groupId).future,
                   );
                   await Future.wait([future1, future2]);
                 },
@@ -235,7 +236,7 @@ final minimizeDebtsProvider = StateProvider.family<bool, int>(
 final balancesProvider = Provider.family
     .autoDispose<AsyncValue<List<BalanceTransfer>>, int>((ref, groupId) {
       final expensesAsync = ref.watch(expensesFutureProvider(groupId));
-      final membersAsync = ref.watch(membersFutureProvider(groupId));
+      final membersAsync = ref.watch(allMembersFutureProvider(groupId));
       final minimize = ref.watch(minimizeDebtsProvider(groupId));
 
       if (expensesAsync.isLoading || membersAsync.isLoading) {
