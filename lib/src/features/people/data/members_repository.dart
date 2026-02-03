@@ -11,8 +11,14 @@ class MembersRepository {
     await _api.post('/groups/$groupId/members/', {'name': name});
   }
 
-  Future<List<Member>> getMembers(int groupId) async {
-    final List<dynamic> json = await _api.get('/groups/$groupId/members/');
+  Future<List<Member>> getMembers(
+    int groupId, {
+    bool includeDeleted = false,
+  }) async {
+    final query = includeDeleted ? '?include_deleted=true' : '';
+    final List<dynamic> json = await _api.get(
+      '/groups/$groupId/members/$query',
+    );
     return json.map((e) => Member.fromJson(e)).toList();
   }
 

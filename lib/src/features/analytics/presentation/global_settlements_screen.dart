@@ -44,7 +44,11 @@ final globalSettlementsProvider =
           final membersRepo = ref.read(membersRepositoryProvider);
           final expensesRepo = ref.read(expensesRepositoryProvider);
 
-          final members = await membersRepo.getMembers(group.id);
+          final members = await membersRepo.getMembers(
+            group.id,
+            includeDeleted: true,
+          );
+
           // Find myself in this group
           final me = members.firstWhere(
             (m) => m.userId == user.id,
@@ -64,7 +68,11 @@ final globalSettlementsProvider =
               // I owe someone
               final other = members.firstWhere(
                 (m) => m.id == transfer.toMemberId,
+                orElse: () =>
+                    Member(id: -1, groupId: group.id, name: 'Unknown'),
               );
+              if (other.id == -1) continue; // Skip unknown members
+
               items.add(
                 GlobalSettlementItem(
                   groupId: group.id,
@@ -79,7 +87,11 @@ final globalSettlementsProvider =
               // Someone owes me
               final other = members.firstWhere(
                 (m) => m.id == transfer.fromMemberId,
+                orElse: () =>
+                    Member(id: -1, groupId: group.id, name: 'Unknown'),
               );
+              if (other.id == -1) continue; // Skip unknown members
+
               items.add(
                 GlobalSettlementItem(
                   groupId: group.id,

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/balance_calculator.dart';
 import '../data/expenses_repository.dart';
-import '../../people/data/members_repository.dart';
 import '../../groups/data/groups_repository.dart';
 import '../../people/domain/member_model.dart';
 import 'settle_up_screen.dart';
