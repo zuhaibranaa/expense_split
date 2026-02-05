@@ -58,7 +58,38 @@ class NotificationService {
         if (kIsWeb) {
           _fcmToken = await messaging.getToken(vapidKey: _vapidKey);
         } else {
-          _fcmToken = await messaging.getToken();
+          if (defaultTargetPlatform == TargetPlatform.iOS) {
+            String? apnsToken = await messaging.getAPNSToken();
+
+            // Retry checking for APNS token
+            if (apnsToken == null) {
+              debugPrint('APNS token not available yet, polling...');
+              for (int i = 0; i < 5; i++) {
+                await Future.delayed(const Duration(seconds: 2));
+                apnsToken = await messaging.getAPNSToken();
+                if (apnsToken != null) {
+                  debugPrint('APNS token found after retry ${i + 1}');
+                  break;
+                }
+              }
+            }
+
+            if (apnsToken != null) {
+              _fcmToken = await messaging.getToken();
+            } else {
+              debugPrint(
+                'APNS token still null after retries. FCM token fetch will likely fail.',
+              );
+              // Try anyway, sometimes getToken handles it internally or it's a simulator issue
+              try {
+                _fcmToken = await messaging.getToken();
+              } catch (e) {
+                debugPrint('Failed to get FCM token without APNS token: $e');
+              }
+            }
+          } else {
+            _fcmToken = await messaging.getToken();
+          }
         }
         debugPrint('FCM Token: $_fcmToken');
 
