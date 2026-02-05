@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "931195916704",
+    "project_id": "equisplit-d4c74",
+    "storage_bucket": "equisplit-d4c74.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:931195916704:android:1ab646ba4b96d35e6294c5",
+        "android_client_info": {
+          "package_name": "com.equisplit.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCmJsMIidhPB2DrBU9b0B-f5GKKISPctsU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
