@@ -58,6 +58,7 @@ dependencies:
   flutter_slidable: ^4.0.3
   flutter_local_notifications: ^19.5.0
   pusher_channels_flutter: ^2.2.1
+  firebase_messaging: ^15.2.0
 
 dev_dependencies:
   flutter_test:

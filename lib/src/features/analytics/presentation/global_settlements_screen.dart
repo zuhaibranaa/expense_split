@@ -297,6 +297,67 @@ class GlobalSettlementsScreen extends ConsumerWidget {
                             ],
                           ),
                         ],
+                        if (isOwesMe) ...[
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () async {
+                                    try {
+                                      await ref
+                                          .read(membersRepositoryProvider)
+                                          .sendSettlementReminder(
+                                            userId: item.other.userId!,
+                                            groupId: item.groupId,
+                                            groupName: item.groupName,
+                                            amount: amount,
+                                            currencySymbol:
+                                                CurrencyUtils.getSymbol(
+                                                  item.groupCurrency,
+                                                ),
+                                          );
+
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Reminder sent to ${item.other.name}',
+                                            ),
+                                            backgroundColor: Colors.green,
+                                          ),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Error sending reminder: $e',
+                                            ),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
+                                  icon: const Icon(
+                                    Icons.notifications_active,
+                                    size: 16,
+                                  ),
+                                  label: const Text('Notify'),
+                                  style: OutlinedButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),

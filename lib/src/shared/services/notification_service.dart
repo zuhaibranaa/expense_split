@@ -1,9 +1,13 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 
 class NotificationService {
   final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
+
+  String? _fcmToken;
 
   Future<void> init() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
@@ -28,6 +32,55 @@ class NotificationService {
         // Handle notification tap
       },
     );
+
+    // Initialize Firebase Messaging (Fire and forget, don't block startup)
+    _initFirebaseMessaging();
+  }
+
+  Future<void> _initFirebaseMessaging() async {
+    try {
+      final messaging = FirebaseMessaging.instance;
+
+      // Request permission
+      // On Web this triggers a prompt. If we await this in main(), app might hang until user interacts.
+      NotificationSettings settings = await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+        debugPrint('User granted permission');
+
+        // Get Token
+        _fcmToken = await messaging.getToken();
+        debugPrint('FCM Token: $_fcmToken');
+
+        // Handle Foreground Messages
+        FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+          debugPrint('Got a message whilst in the foreground!');
+          debugPrint('Message data: ${message.data}');
+
+          if (message.notification != null) {
+            debugPrint(
+              'Message also contained a notification: ${message.notification}',
+            );
+            showNotification(
+              title: message.notification!.title,
+              body: message.notification!.body,
+            );
+          }
+        });
+      } else {
+        debugPrint('User declined or has not accepted permission');
+      }
+    } catch (e) {
+      debugPrint('Error initializing Firebase Messaging: $e');
+    }
+  }
+
+  Future<String?> getFcmToken() async {
+    return _fcmToken ?? await FirebaseMessaging.instance.getToken();
   }
 
   Future<void> showNotification({
@@ -72,6 +125,8 @@ class NotificationService {
           AndroidFlutterLocalNotificationsPlugin
         >()
         ?.requestNotificationsPermission();
+
+    await FirebaseMessaging.instance.requestPermission();
   }
 }
 

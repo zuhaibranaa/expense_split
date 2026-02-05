@@ -6,15 +6,18 @@ import 'package:flutter/foundation.dart';
 import '../../../shared/data/api_client.dart';
 import '../domain/user_model.dart';
 
+import '../../../shared/services/notification_service.dart';
+
 // Use SharedPreferences instead of FlutterSecureStorage for web compatibility
 // FlutterSecureStorage has Platform issues on web
 const _kUserIdKey = 'user_id';
 
 class AuthRepository {
   final ApiClient _api;
+  final NotificationService _notificationService;
   User? _currentUser;
 
-  AuthRepository(this._api);
+  AuthRepository(this._api, this._notificationService);
 
   User? get currentUser => _currentUser;
 
@@ -32,7 +35,8 @@ class AuthRepository {
       try {
         final json = jsonDecode(userJsonString);
         _currentUser = User.fromJson(json);
-        // Optionally verify token validity or refresh user
+        // Update FCM Token on restore
+        _updateFcmToken();
         return _currentUser;
       } catch (e) {
         // Session invalid
@@ -41,6 +45,25 @@ class AuthRepository {
       }
     }
     return null;
+  }
+
+  Future<void> _updateFcmToken() async {
+    try {
+      final token = await _notificationService.getFcmToken();
+      if (token != null) {
+        String deviceType = 'android';
+        if (defaultTargetPlatform == TargetPlatform.iOS) {
+          deviceType = 'ios';
+        }
+
+        await _api.post('/fcm-token', {
+          'fcm_token': token,
+          'device_type': deviceType,
+        }, shouldHandleError: false);
+      }
+    } catch (e) {
+      debugPrint('Failed to update FCM token: $e');
+    }
   }
 
   Future<bool> checkEmail(String email) async {
@@ -69,6 +92,7 @@ class AuthRepository {
 
     _currentUser = User.fromJson(userMap);
     await _saveSession(_currentUser!);
+    await _updateFcmToken();
   }
 
   Future<void> register(
@@ -99,6 +123,7 @@ class AuthRepository {
 
     _currentUser = User.fromJson(userMap);
     await _saveSession(_currentUser!);
+    await _updateFcmToken();
   }
 
   Future<void> _saveSession(User user) async {
@@ -225,7 +250,10 @@ class AuthRepository {
 }
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  return AuthRepository(ref.watch(apiClientProvider));
+  return AuthRepository(
+    ref.watch(apiClientProvider),
+    ref.watch(notificationServiceProvider),
+  );
 });
 
 final authControllerProvider =

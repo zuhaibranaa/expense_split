@@ -33,6 +33,26 @@ class MembersRepository {
     });
   }
 
+  Future<void> sendTestNotification(int userId) async {
+    await _api.post('/notification/send-test-to-user', {'user_id': userId});
+  }
+
+  Future<void> sendSettlementReminder({
+    required int userId,
+    required int groupId,
+    required String groupName,
+    required double amount,
+    required String currencySymbol,
+  }) async {
+    await _api.post('/notification/remind-settlement', {
+      'user_id': userId,
+      'group_id': groupId,
+      'group_name': groupName,
+      'amount': amount,
+      'currency_symbol': currencySymbol,
+    });
+  }
+
   Future<void> removeMember(int memberId, int userId) async {
     await _api.delete('/members/$memberId?user_id=$userId');
   }
