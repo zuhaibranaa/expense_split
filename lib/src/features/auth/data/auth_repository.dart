@@ -52,7 +52,9 @@ class AuthRepository {
       final token = await _notificationService.getFcmToken();
       if (token != null) {
         String deviceType = 'android';
-        if (defaultTargetPlatform == TargetPlatform.iOS) {
+        if (kIsWeb) {
+          deviceType = 'web';
+        } else if (defaultTargetPlatform == TargetPlatform.iOS) {
           deviceType = 'ios';
         }
 

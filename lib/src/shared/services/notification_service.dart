@@ -8,6 +8,8 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   String? _fcmToken;
+  static const String _vapidKey =
+      'BHFYMw81dqq6kMHJuhv7A4E9_wcx_gFAMu-UpeLS9-grGliRMNbChXeROniX6aZPOn9x8AGHXQs52PugaU5jlMw';
 
   Future<void> init() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
@@ -53,7 +55,11 @@ class NotificationService {
         debugPrint('User granted permission');
 
         // Get Token
-        _fcmToken = await messaging.getToken();
+        if (kIsWeb) {
+          _fcmToken = await messaging.getToken(vapidKey: _vapidKey);
+        } else {
+          _fcmToken = await messaging.getToken();
+        }
         debugPrint('FCM Token: $_fcmToken');
 
         // Handle Foreground Messages
@@ -80,6 +86,10 @@ class NotificationService {
   }
 
   Future<String?> getFcmToken() async {
+    if (kIsWeb) {
+      return _fcmToken ??
+          await FirebaseMessaging.instance.getToken(vapidKey: _vapidKey);
+    }
     return _fcmToken ?? await FirebaseMessaging.instance.getToken();
   }
 
