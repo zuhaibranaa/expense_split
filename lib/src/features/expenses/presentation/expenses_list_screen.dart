@@ -64,7 +64,12 @@ class ExpensesListScreen extends ConsumerWidget {
         icon: const Icon(Icons.receipt_long),
       ),
       body: expensesAsync.when(
-        data: (items) {
+        data: (allExpenses) {
+          final items = allExpenses
+              .where(
+                (e) => !e.isSettlement && e.category.toLowerCase() != 'payment',
+              )
+              .toList();
           if (items.isEmpty) {
             return RefreshIndicator(
               onRefresh: () async {

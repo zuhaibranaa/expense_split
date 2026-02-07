@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/group_model.dart';
 import '../../people/presentation/members_list_view.dart';
 import '../../expenses/presentation/expenses_list_screen.dart';
+import '../../expenses/presentation/payments_list_screen.dart';
 import '../../expenses/presentation/balances_screen.dart';
 import '../../analytics/presentation/group_stats_screen.dart';
 import 'group_settings_screen.dart';
@@ -15,11 +16,12 @@ class GroupDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DefaultTabController(
-      length: 5, // Changed from 4 to 5
+      length: 6, // Changed from 5 to 6
       child: Scaffold(
         appBar: AppBar(
           title: Text(group.name),
           bottom: TabBar(
+            isScrollable: true,
             indicator: const UnderlineTabIndicator(
               borderSide: BorderSide(width: 3.0, color: Color(0xFF00E5FF)),
               insets: EdgeInsets.symmetric(horizontal: 16.0),
@@ -30,6 +32,7 @@ class GroupDetailScreen extends ConsumerWidget {
             labelStyle: const TextStyle(fontWeight: FontWeight.bold),
             tabs: const [
               Tab(text: 'Expenses'),
+              Tab(text: 'Payments'),
               Tab(text: 'Balances'),
               Tab(text: 'People'),
               Tab(text: 'Stats'),
@@ -40,6 +43,10 @@ class GroupDetailScreen extends ConsumerWidget {
         body: TabBarView(
           children: [
             ExpensesListScreen(
+              groupId: group.id,
+              groupCurrency: group.currency,
+            ),
+            PaymentsListScreen(
               groupId: group.id,
               groupCurrency: group.currency,
             ),

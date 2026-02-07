@@ -83,7 +83,11 @@ class Expense {
       payerId: json['payer_id'],
       payer: json['payer'] != null ? Member.fromJson(json['payer']) : null,
       date: DateTime.parse(json['date']),
-      isSettlement: json['is_settlement'] == true || json['is_settlement'] == 1,
+      isSettlement:
+          json['is_settlement'] == true ||
+          json['is_settlement'] == 1 ||
+          json['is_settlement'] == 'true' ||
+          json['is_settlement'] == '1',
       splits:
           (json['splits'] as List?)
               ?.map((e) => ExpenseSplit.fromJson(e))
