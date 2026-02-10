@@ -42,6 +42,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
+          if (index == 3) {
+            ref.read(authControllerProvider.notifier).reloadUser();
+          }
           setState(() {
             _currentIndex = index;
           });

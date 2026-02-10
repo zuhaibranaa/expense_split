@@ -201,10 +201,6 @@ class ApiClient {
           }
           return json['message'].toString();
         }
-        // Legacy/Other formats
-        if (json['status'] == false && json.containsKey('error')) {
-          return json['error'].toString();
-        }
       }
     } catch (e) {
       // Not JSON

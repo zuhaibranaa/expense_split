@@ -334,10 +334,17 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
 
   Future<void> reloadUser() async {
     final repo = ref.read(authRepositoryProvider);
-    state = await AsyncValue.guard(() async {
+    // Use try-catch instead of AsyncValue.guard to prevent setting state to error
+    // which would cause AuthGate to redirect to LoginScreen
+    try {
       final user = await repo.refreshUser();
-      return user;
-    });
+      if (user != null) {
+        state = AsyncValue.data(user);
+      }
+    } catch (e) {
+      debugPrint('Failed to reload user: $e');
+      // Do not update state to error, keep previous state (data)
+    }
   }
 
   Future<void> requestVerification() async {
