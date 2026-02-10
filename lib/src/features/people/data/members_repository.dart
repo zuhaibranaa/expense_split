@@ -22,15 +22,8 @@ class MembersRepository {
     return json.map((e) => Member.fromJson(e)).toList();
   }
 
-  Future<void> updateMember(
-    int groupId,
-    int memberId,
-    int userId, {
-    String? name,
-  }) async {
-    await _api.put('/groups/$groupId/members/$memberId?user_id=$userId', {
-      if (name != null) 'name': name,
-    });
+  Future<void> updateMember(int groupId, int memberId, {String? name}) async {
+    await _api.put('/members/$memberId', {'name': name});
   }
 
   Future<void> sendTestNotification(int userId) async {
@@ -114,7 +107,7 @@ class MembersNotifier
     }
 
     try {
-      await repo.updateMember(arg, memberId, userId, name: name);
+      await repo.updateMember(arg, memberId, name: name);
     } catch (e) {
       state = previousState;
       rethrow;
