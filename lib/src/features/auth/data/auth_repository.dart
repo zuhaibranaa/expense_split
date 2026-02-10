@@ -141,6 +141,7 @@ class AuthRepository {
     String? iban,
     String? password,
     String? passwordConfirmation,
+    String? currentPassword,
     bool shouldHandleError = true,
   }) async {
     if (_currentUser == null) return;
@@ -158,6 +159,7 @@ class AuthRepository {
       if (password != null) 'password': password,
       if (passwordConfirmation != null)
         'password_confirmation': passwordConfirmation,
+      if (currentPassword != null) 'current_password': currentPassword,
     }, shouldHandleError: shouldHandleError);
 
     // If response is the user object directly (data['user'] or just data=user)
@@ -308,6 +310,7 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
     String? iban,
     String? password,
     String? passwordConfirmation,
+    String? currentPassword,
     bool shouldHandleError = true,
   }) async {
     final repo = ref.read(authRepositoryProvider);
@@ -321,6 +324,7 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
         iban: iban,
         password: password,
         passwordConfirmation: passwordConfirmation,
+        currentPassword: currentPassword,
         shouldHandleError: shouldHandleError,
       );
       state = AsyncValue.data(repo.currentUser);

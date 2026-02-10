@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -47,11 +48,20 @@ class ApiClient {
   }
 
   Future<dynamic> get(String endpoint) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: _getHeaders(),
-    );
-    return _handleResponse(response);
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: _getHeaders(),
+      );
+      return _handleResponse(response);
+    } on SocketException {
+      const errorMessage =
+          'No internet connection. Please check your network settings.';
+      GlobalErrorHandler.showError(errorMessage);
+      throw Exception(errorMessage);
+    } catch (e) {
+      rethrow;
+    }
   }
 
   Future<dynamic> post(
@@ -67,6 +77,13 @@ class ApiClient {
         body: jsonEncode(body),
       );
       return _handleResponse(response, shouldHandleError: shouldHandleError);
+    } on SocketException {
+      const errorMessage =
+          'No internet connection. Please check your network settings.';
+      if (shouldHandleError) {
+        GlobalErrorHandler.showError(errorMessage);
+      }
+      throw Exception(errorMessage);
     } catch (e) {
       rethrow;
     }
@@ -77,20 +94,40 @@ class ApiClient {
     Map<String, dynamic> body, {
     bool shouldHandleError = true,
   }) async {
-    final response = await http.put(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: _getHeaders(),
-      body: jsonEncode(body),
-    );
-    return _handleResponse(response, shouldHandleError: shouldHandleError);
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      );
+      return _handleResponse(response, shouldHandleError: shouldHandleError);
+    } on SocketException {
+      const errorMessage =
+          'No internet connection. Please check your network settings.';
+      if (shouldHandleError) {
+        GlobalErrorHandler.showError(errorMessage);
+      }
+      throw Exception(errorMessage);
+    } catch (e) {
+      rethrow;
+    }
   }
 
   Future<dynamic> delete(String endpoint) async {
-    final response = await http.delete(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: _getHeaders(),
-    );
-    return _handleResponse(response);
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: _getHeaders(),
+      );
+      return _handleResponse(response);
+    } on SocketException {
+      const errorMessage =
+          'No internet connection. Please check your network settings.';
+      GlobalErrorHandler.showError(errorMessage);
+      throw Exception(errorMessage);
+    } catch (e) {
+      rethrow;
+    }
   }
 
   Future<dynamic> postMultipart(
@@ -100,41 +137,52 @@ class ApiClient {
     Uint8List? fileBytes,
     String? filename,
   }) async {
-    final request = http.MultipartRequest(
-      'POST',
-      Uri.parse('$baseUrl$endpoint'),
-    );
-
-    // Add auth header to multipart request
-    if (_authToken != null) {
-      request.headers['Authorization'] = 'Bearer $_authToken';
-    }
-
-    if (fileBytes != null) {
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          fieldName,
-          fileBytes,
-          filename: filename ?? 'upload.jpg',
-        ),
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl$endpoint'),
       );
-    } else if (filePath != null) {
-      request.files.add(await http.MultipartFile.fromPath(fieldName, filePath));
-    } else {
-      throw Exception('Either filePath or fileBytes must be provided');
-    }
 
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      return jsonDecode(responseBody);
-    } else {
-      final errorMessage = _getFriendlyErrorMessage(
-        response.statusCode,
-        responseBody,
-      );
+      // Add auth header to multipart request
+      if (_authToken != null) {
+        request.headers['Authorization'] = 'Bearer $_authToken';
+      }
+
+      if (fileBytes != null) {
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            fieldName,
+            fileBytes,
+            filename: filename ?? 'upload.jpg',
+          ),
+        );
+      } else if (filePath != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath(fieldName, filePath),
+        );
+      } else {
+        throw Exception('Either filePath or fileBytes must be provided');
+      }
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return jsonDecode(responseBody);
+      } else {
+        final errorMessage = _getFriendlyErrorMessage(
+          response.statusCode,
+          responseBody,
+        );
+        GlobalErrorHandler.showError(errorMessage);
+        throw Exception('API Error: ${response.statusCode} $responseBody');
+      }
+    } on SocketException {
+      const errorMessage =
+          'No internet connection. Please check your network settings.';
       GlobalErrorHandler.showError(errorMessage);
-      throw Exception('API Error: ${response.statusCode} $responseBody');
+      throw Exception(errorMessage);
+    } catch (e) {
+      rethrow;
     }
   }
 

@@ -384,6 +384,7 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   void _showChangePasswordDialog(BuildContext context, WidgetRef ref) {
+    final currentPasswordController = TextEditingController();
     final passwordController = TextEditingController();
     final confirmController = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -404,9 +405,24 @@ class ProfileScreen extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     TextFormField(
-                      controller: passwordController,
+                      controller: currentPasswordController,
                       obscureText: true,
                       autofocus: true,
+                      decoration: const InputDecoration(
+                        labelText: "Current Password",
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return "Please enter your current password";
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: passwordController,
+                      obscureText: true,
                       decoration: const InputDecoration(
                         labelText: "New Password",
                         border: OutlineInputBorder(),
@@ -469,6 +485,8 @@ class ProfileScreen extends ConsumerWidget {
                             await ref
                                 .read(authControllerProvider.notifier)
                                 .updateProfile(
+                                  currentPassword:
+                                      currentPasswordController.text,
                                   password: passwordController.text,
                                   passwordConfirmation: confirmController.text,
                                   shouldHandleError: false,
@@ -492,6 +510,10 @@ class ProfileScreen extends ConsumerWidget {
                                 }
                                 errorText = msg;
                                 isLoading = false;
+                                // Clear current password field on error as it might be wrong
+                                if (msg.toLowerCase().contains("password")) {
+                                  currentPasswordController.clear();
+                                }
                               });
                             }
                           }
