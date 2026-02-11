@@ -23,30 +23,7 @@ class GroupDetailScreen extends ConsumerWidget {
           return Scaffold(
             appBar: AppBar(
               title: Text(group.name),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.filter_list_rounded),
-                  onPressed: () {
-                    // Get current tab index to determine if we show date filter
-                    final tabController = DefaultTabController.of(context);
-                    final index = tabController.index;
-                    // Balances is at index 2 (Expenses=0, Payments=1, Balances=2)
-                    final showDate = index != 2;
-
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (context) => FilterModal(
-                        groupId: group.id,
-                        showDateFilter: showDate,
-                        showSimplifyDebts:
-                            !showDate, // Only show on Balances (where showDate is false)
-                      ),
-                    );
-                  },
-                ),
-              ],
+              actions: [_FilterActionButton(groupId: group.id)],
               bottom: TabBar(
                 isScrollable: true,
                 indicator: const UnderlineTabIndicator(
@@ -92,6 +69,79 @@ class GroupDetailScreen extends ConsumerWidget {
           );
         },
       ),
+    );
+  }
+}
+
+class _FilterActionButton extends StatefulWidget {
+  final int groupId;
+
+  const _FilterActionButton({required this.groupId});
+
+  @override
+  State<_FilterActionButton> createState() => _FilterActionButtonState();
+}
+
+class _FilterActionButtonState extends State<_FilterActionButton> {
+  TabController? _tabController;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final controller = DefaultTabController.of(context);
+    if (controller != _tabController) {
+      _tabController?.removeListener(_handleTabChange);
+      _tabController = controller;
+      _tabController?.addListener(_handleTabChange);
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController?.removeListener(_handleTabChange);
+    super.dispose();
+  }
+
+  void _handleTabChange() {
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_tabController == null) return const SizedBox.shrink();
+
+    final index = _tabController!.index;
+
+    // Hide on People (3) and Settings (5)
+    if (index == 3 || index == 5) {
+      return const SizedBox.shrink();
+    }
+
+    return IconButton(
+      icon: const Icon(Icons.filter_list_rounded),
+      onPressed: () {
+        // Configure modal based on tab
+        // 0: Expenses, 1: Payments - Standard
+        // 2: Balances - No Date, Simplify Toggle
+        // 4: Stats - Month Picker, No Member Filter
+
+        final showDate = index != 2; // Hide date on Balances
+        final showSimplify = index == 2; // Show simplify on Balances
+        final isStats = index == 4;
+
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => FilterModal(
+            groupId: widget.groupId,
+            showDateFilter: showDate,
+            showSimplifyDebts: showSimplify,
+            showMemberFilter: !isStats, // Hide member filter on Stats
+            useMonthPicker: isStats, // Use month picker on Stats
+          ),
+        );
+      },
     );
   }
 }

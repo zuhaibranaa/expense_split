@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../features/expenses/presentation/expenses_providers.dart';
 import '../../../features/groups/data/groups_repository.dart';
+import 'month_picker_dialog.dart';
 
 import 'user_filter_list.dart';
 
@@ -10,12 +11,16 @@ class FilterModal extends ConsumerWidget {
   final int groupId;
   final bool showDateFilter;
   final bool showSimplifyDebts;
+  final bool showMemberFilter;
+  final bool useMonthPicker;
 
   const FilterModal({
     super.key,
     required this.groupId,
     this.showDateFilter = true,
     this.showSimplifyDebts = false,
+    this.showMemberFilter = true,
+    this.useMonthPicker = false,
   });
 
   @override
@@ -60,7 +65,7 @@ class FilterModal extends ConsumerWidget {
           // Date Filter Section
           if (showDateFilter) ...[
             Text(
-              'DATE RANGE',
+              useMonthPicker ? 'SELECT MONTH' : 'DATE RANGE',
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -73,27 +78,65 @@ class FilterModal extends ConsumerWidget {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () async {
-                      final picked = await showDateRangePicker(
-                        context: context,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                        initialDateRange: dateRange,
-                      );
-                      if (picked != null) {
-                        ref
-                                .read(
-                                  expenseDateRangeFilterProvider(
-                                    groupId,
-                                  ).notifier,
-                                )
-                                .state =
-                            picked;
+                      if (useMonthPicker) {
+                        final picked = await showDialog<DateTime>(
+                          context: context,
+                          builder: (context) => MonthPickerDialog(
+                            initialDate: dateRange?.start ?? DateTime.now(),
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 365),
+                            ),
+                          ),
+                        );
+                        if (picked != null) {
+                          // Create range for the whole month
+                          final start = DateTime(picked.year, picked.month, 1);
+                          final end = DateTime(
+                            picked.year,
+                            picked.month + 1,
+                            0,
+                          ); // Last day of month
+                          ref
+                              .read(
+                                expenseDateRangeFilterProvider(
+                                  groupId,
+                                ).notifier,
+                              )
+                              .state = DateTimeRange(
+                            start: start,
+                            end: end,
+                          );
+                        }
+                      } else {
+                        final picked = await showDateRangePicker(
+                          context: context,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 365),
+                          ),
+                          initialDateRange: dateRange,
+                        );
+                        if (picked != null) {
+                          ref
+                                  .read(
+                                    expenseDateRangeFilterProvider(
+                                      groupId,
+                                    ).notifier,
+                                  )
+                                  .state =
+                              picked;
+                        }
                       }
                     },
                     icon: const Icon(Icons.calendar_today, size: 18),
                     label: Text(
                       dateRange == null
-                          ? 'Select Date Range'
+                          ? (useMonthPicker
+                                ? 'Select Month'
+                                : 'Select Date Range')
+                          : useMonthPicker
+                          ? DateFormat.yMMMM().format(dateRange.start)
                           : '${DateFormat.MMMd().format(dateRange.start)} - ${DateFormat.MMMd().format(dateRange.end)}',
                     ),
                     style: OutlinedButton.styleFrom(
@@ -154,29 +197,30 @@ class FilterModal extends ConsumerWidget {
           ],
 
           // User Filter Section
-          Text(
-            'FILTER BY MEMBER',
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              letterSpacing: 1.0,
+          if (showMemberFilter) ...[
+            Text(
+              'FILTER BY MEMBER',
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                letterSpacing: 1.0,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          membersAsync.when(
-            data: (members) => UserFilterList(
-              members: members,
-              selectedMemberId: selectedUserId,
-              onSelected: (id) {
-                ref.read(expenseUserFilterProvider(groupId).notifier).state =
-                    id;
-              },
+            const SizedBox(height: 12),
+            membersAsync.when(
+              data: (members) => UserFilterList(
+                members: members,
+                selectedMemberId: selectedUserId,
+                onSelected: (id) {
+                  ref.read(expenseUserFilterProvider(groupId).notifier).state =
+                      id;
+                },
+              ),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, s) => const Text('Failed to load members'),
             ),
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, s) => const Text('Failed to load members'),
-          ),
-
-          const SizedBox(height: 32),
+            const SizedBox(height: 32),
+          ],
 
           FilledButton(
             onPressed: () => Navigator.pop(context),

@@ -4,6 +4,8 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../expenses/data/expenses_repository.dart';
 import '../../expenses/domain/expense_model.dart';
 import '../../../shared/utils/currency_utils.dart';
+import '../../expenses/presentation/expenses_providers.dart';
+import 'package:intl/intl.dart';
 
 class GroupStatsScreen extends ConsumerStatefulWidget {
   final int groupId;
@@ -20,25 +22,12 @@ class GroupStatsScreen extends ConsumerStatefulWidget {
 }
 
 class _GroupStatsScreenState extends ConsumerState<GroupStatsScreen> {
-  int _periodIndex = 2; // 0: Month, 1: Quarter, 2: Year
+  List<Expense> _filterExpenses(List<Expense> expenses, DateTimeRange? range) {
+    if (range == null) return expenses;
 
-  List<Expense> _filterExpenses(List<Expense> expenses) {
-    if (_periodIndex == 2) {
-      return expenses; // Year (Show all for simplicity or current year)
-    }
-
-    final now = DateTime.now();
     return expenses.where((e) {
-      if (_periodIndex == 0) {
-        // Current Month
-        return e.date.year == now.year && e.date.month == now.month;
-      } else if (_periodIndex == 1) {
-        // Current Quarter
-        final currentQuarter = ((now.month - 1) / 3).floor();
-        final expenseQuarter = ((e.date.month - 1) / 3).floor();
-        return e.date.year == now.year && currentQuarter == expenseQuarter;
-      }
-      return true;
+      return e.date.isAfter(range.start.subtract(const Duration(seconds: 1))) &&
+          e.date.isBefore(range.end.add(const Duration(seconds: 1)));
     }).toList();
   }
 
@@ -46,16 +35,17 @@ class _GroupStatsScreenState extends ConsumerState<GroupStatsScreen> {
   Widget build(BuildContext context) {
     final expensesAsync = ref.watch(expensesFutureProvider(widget.groupId));
     final currencySymbol = CurrencyUtils.getSymbol(widget.groupCurrency);
+    final dateRange = ref.watch(expenseDateRangeFilterProvider(widget.groupId));
 
     return expensesAsync.when(
       data: (allExpenses) {
-        final expenses = _filterExpenses(allExpenses);
+        final expenses = _filterExpenses(allExpenses, dateRange);
 
         if (expenses.isEmpty) {
           return Column(
             children: [
               const SizedBox(height: 16),
-              _buildPeriodSelector(),
+              _buildDatePill(dateRange),
               const Expanded(
                 child: Center(
                   child: Text('No expenses found for this period.'),
@@ -105,7 +95,7 @@ class _GroupStatsScreenState extends ConsumerState<GroupStatsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Center(child: _buildPeriodSelector()),
+                Center(child: _buildDatePill(dateRange)),
                 const SizedBox(height: 24),
 
                 // Summary Card (Matching StatsScreen)
@@ -282,25 +272,24 @@ class _GroupStatsScreenState extends ConsumerState<GroupStatsScreen> {
     );
   }
 
-  Widget _buildPeriodSelector() {
-    return ToggleButtons(
-      isSelected: [_periodIndex == 0, _periodIndex == 1, _periodIndex == 2],
-      onPressed: (index) => setState(() => _periodIndex = index),
-      borderRadius: BorderRadius.circular(20),
-      children: const [
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Text('Month'),
+  Widget _buildDatePill(DateTimeRange? range) {
+    final text = range == null
+        ? 'All Time'
+        : DateFormat.yMMMM().format(range.start);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.bold,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Text('Quarter'),
-        ),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Text('Year'),
-        ),
-      ],
+      ),
     );
   }
 

@@ -143,7 +143,7 @@ class _SettleUpScreenState extends ConsumerState<SettleUpScreen> {
               decoration: InputDecoration(
                 labelText:
                     'Amount (${CurrencyUtils.getSymbol(widget.groupCurrency)})',
-                prefixIcon: const Icon(Icons.attach_money),
+                prefixIcon: const Icon(Icons.credit_card),
                 border: const OutlineInputBorder(),
                 helperText: 'Enter the amount paid',
               ),
