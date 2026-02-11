@@ -85,12 +85,68 @@ class BalancesScreen extends ConsumerWidget {
                         );
                       },
                     ),
+
+                    // Member Filter Section
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: members.map((member) {
+                          final selectedMemberId = ref.watch(
+                            selectedMemberFilterProvider(groupId),
+                          );
+                          final isSelected = selectedMemberId == member.id;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: FilterChip(
+                              label: Text(member.name),
+                              selected: isSelected,
+                              onSelected: (selected) {
+                                ref
+                                    .read(
+                                      selectedMemberFilterProvider(
+                                        groupId,
+                                      ).notifier,
+                                    )
+                                    .state = selected
+                                    ? member.id
+                                    : null;
+                              },
+                              avatar: UserAvatar(
+                                radius: 10,
+                                avatarUrl: member.avatarUrl,
+                                name: member.name,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
                     const Divider(height: 1),
                     Expanded(
                       child: ListView.builder(
-                        itemCount: transfers.length,
+                        itemCount: transfers.where((t) {
+                          final selectedId = ref.watch(
+                            selectedMemberFilterProvider(groupId),
+                          );
+                          if (selectedId == null) return true;
+                          return t.fromMemberId == selectedId ||
+                              t.toMemberId == selectedId;
+                        }).length,
                         itemBuilder: (context, index) {
-                          final transfer = transfers[index];
+                          final selectedId = ref.watch(
+                            selectedMemberFilterProvider(groupId),
+                          );
+                          final filteredTransfers = selectedId == null
+                              ? transfers
+                              : transfers
+                                    .where(
+                                      (t) =>
+                                          t.fromMemberId == selectedId ||
+                                          t.toMemberId == selectedId,
+                                    )
+                                    .toList();
+                          final transfer = filteredTransfers[index];
                           // Helper to get Member object
                           Member getMember(int id) => members.firstWhere(
                             (m) => m.id == id,
@@ -230,6 +286,10 @@ class BalancesScreen extends ConsumerWidget {
 
 final minimizeDebtsProvider = StateProvider.family<bool, int>(
   (ref, groupId) => true,
+);
+
+final selectedMemberFilterProvider = StateProvider.family<int?, int>(
+  (ref, groupId) => null,
 );
 
 final balancesProvider = Provider.family
