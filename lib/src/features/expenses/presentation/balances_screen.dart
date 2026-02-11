@@ -7,6 +7,7 @@ import '../../people/domain/member_model.dart';
 import 'settle_up_screen.dart';
 import '../../../shared/utils/currency_utils.dart';
 import 'package:equisplit/src/shared/presentation/widgets/user_avatar.dart';
+import 'expenses_providers.dart';
 
 class BalancesScreen extends ConsumerWidget {
   final int groupId;
@@ -20,8 +21,36 @@ class BalancesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final balancesAsync = ref.watch(balancesProvider(groupId));
+    // USE unfiltered provider for balances so logic is always over ALL expenses
+    // Filters are applied LOCALLY to the result
+    final expensesAsync = ref.watch(unfilteredExpensesFutureProvider(groupId));
     final membersAsync = ref.watch(allMembersFutureProvider(groupId));
+    final minimize = ref.watch(minimizeDebtsProvider(groupId));
+    final selectedUserId = ref.watch(expenseUserFilterProvider(groupId));
+
+    // We calculate balances here instead of in a provider to easily apply local filters
+    // or we could make a "filteredBalancesProvider" but calculating here is fine for now
+    final balancesAsync = expensesAsync.whenData((expenses) {
+      if (membersAsync.hasValue) {
+        final transfers = BalanceCalculator.calculateBalances(
+          expenses,
+          membersAsync.value!,
+          minimize: minimize,
+        );
+
+        if (selectedUserId != null) {
+          return transfers
+              .where(
+                (t) =>
+                    t.fromMemberId == selectedUserId ||
+                    t.toMemberId == selectedUserId,
+              )
+              .toList();
+        }
+        return transfers;
+      }
+      return <BalanceTransfer>[];
+    });
 
     return Scaffold(
       body: balancesAsync.when(
@@ -30,7 +59,7 @@ class BalancesScreen extends ConsumerWidget {
             return RefreshIndicator(
               onRefresh: () async {
                 final future1 = ref.refresh(
-                  expensesFutureProvider(groupId).future,
+                  unfilteredExpensesFutureProvider(groupId).future,
                 );
                 final future2 = ref.refresh(
                   allMembersFutureProvider(groupId).future,
@@ -54,7 +83,7 @@ class BalancesScreen extends ConsumerWidget {
                 onRefresh: () async {
                   // Refresh both dependencies
                   final future1 = ref.refresh(
-                    expensesFutureProvider(groupId).future,
+                    unfilteredExpensesFutureProvider(groupId).future,
                   );
                   final future2 = ref.refresh(
                     allMembersFutureProvider(groupId).future,
@@ -63,90 +92,13 @@ class BalancesScreen extends ConsumerWidget {
                 },
                 child: Column(
                   children: [
-                    Consumer(
-                      builder: (context, ref, _) {
-                        final minimize = ref.watch(
-                          minimizeDebtsProvider(groupId),
-                        );
-                        return SwitchListTile(
-                          title: const Text('Simplify Debts'),
-                          subtitle: const Text(
-                            'Minimize total number of transactions',
-                          ),
-                          value: minimize,
-                          onChanged: (val) {
-                            ref
-                                    .read(
-                                      minimizeDebtsProvider(groupId).notifier,
-                                    )
-                                    .state =
-                                val;
-                          },
-                        );
-                      },
-                    ),
-
                     // Member Filter Section
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: members.map((member) {
-                          final selectedMemberId = ref.watch(
-                            selectedMemberFilterProvider(groupId),
-                          );
-                          final isSelected = selectedMemberId == member.id;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: FilterChip(
-                              label: Text(member.name),
-                              selected: isSelected,
-                              onSelected: (selected) {
-                                ref
-                                    .read(
-                                      selectedMemberFilterProvider(
-                                        groupId,
-                                      ).notifier,
-                                    )
-                                    .state = selected
-                                    ? member.id
-                                    : null;
-                              },
-                              avatar: UserAvatar(
-                                radius: 10,
-                                avatarUrl: member.avatarUrl,
-                                name: member.name,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
                     const Divider(height: 1),
                     Expanded(
                       child: ListView.builder(
-                        itemCount: transfers.where((t) {
-                          final selectedId = ref.watch(
-                            selectedMemberFilterProvider(groupId),
-                          );
-                          if (selectedId == null) return true;
-                          return t.fromMemberId == selectedId ||
-                              t.toMemberId == selectedId;
-                        }).length,
+                        itemCount: transfers.length,
                         itemBuilder: (context, index) {
-                          final selectedId = ref.watch(
-                            selectedMemberFilterProvider(groupId),
-                          );
-                          final filteredTransfers = selectedId == null
-                              ? transfers
-                              : transfers
-                                    .where(
-                                      (t) =>
-                                          t.fromMemberId == selectedId ||
-                                          t.toMemberId == selectedId,
-                                    )
-                                    .toList();
-                          final transfer = filteredTransfers[index];
+                          final transfer = transfers[index];
                           // Helper to get Member object
                           Member getMember(int id) => members.firstWhere(
                             (m) => m.id == id,
@@ -283,14 +235,6 @@ class BalancesScreen extends ConsumerWidget {
     );
   }
 }
-
-final minimizeDebtsProvider = StateProvider.family<bool, int>(
-  (ref, groupId) => true,
-);
-
-final selectedMemberFilterProvider = StateProvider.family<int?, int>(
-  (ref, groupId) => null,
-);
 
 final balancesProvider = Provider.family
     .autoDispose<AsyncValue<List<BalanceTransfer>>, int>((ref, groupId) {

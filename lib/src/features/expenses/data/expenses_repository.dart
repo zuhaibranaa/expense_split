@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/data/api_client.dart';
 import '../domain/expense_model.dart';
+import '../presentation/expenses_providers.dart'; // For filter providers
 // Needed if we reference Member
 
 class ExpensesRepository {
@@ -42,8 +43,34 @@ class ExpensesRepository {
     });
   }
 
-  Future<List<Expense>> getExpenses(int groupId) async {
-    final List<dynamic> json = await _api.get('/groups/$groupId/expenses/');
+  Future<List<Expense>> getExpenses(
+    int groupId, {
+    DateTime? startDate,
+    DateTime? endDate,
+    int? memberId,
+  }) async {
+    final queryParams = <String, String>{};
+    if (startDate != null) {
+      queryParams['start_date'] = startDate.toIso8601String();
+    }
+    if (endDate != null) {
+      queryParams['end_date'] = endDate.toIso8601String();
+    }
+    if (memberId != null) {
+      queryParams['member_id'] = memberId.toString();
+    }
+
+    // ApiClient handles base URL, but we need to check if it handles full Uri or just path string
+    // Assuming ApiClient.get takes a string path. We construct query string manually if needed or rely on ApiClient.
+    // Let's check api_client.dart usage. It seems to take a string path.
+    // So we append query string.
+
+    String path = '/groups/$groupId/expenses/';
+    if (queryParams.isNotEmpty) {
+      path += '?${Uri(queryParameters: queryParams).query}';
+    }
+
+    final List<dynamic> json = await _api.get(path);
     return json.map((e) => Expense.fromJson(e)).toList();
   }
 
@@ -99,7 +126,15 @@ class ExpensesNotifier
   @override
   Future<List<Expense>> build(int arg) async {
     final repo = ref.read(expensesRepositoryProvider);
-    return repo.getExpenses(arg);
+    final dateRange = ref.watch(expenseDateRangeFilterProvider(arg));
+    final memberId = ref.watch(expenseUserFilterProvider(arg));
+
+    return repo.getExpenses(
+      arg,
+      startDate: dateRange?.start,
+      endDate: dateRange?.end,
+      memberId: memberId,
+    );
   }
 
   Future<void> createExpense({

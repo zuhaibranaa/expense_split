@@ -65,11 +65,11 @@ class ExpensesListScreen extends ConsumerWidget {
       ),
       body: expensesAsync.when(
         data: (allExpenses) {
-          final items = allExpenses
-              .where(
-                (e) => !e.isSettlement && e.category.toLowerCase() != 'payment',
-              )
-              .toList();
+          final items = allExpenses.where((e) {
+            // Keep strictly view-logic filtering (hiding settlements in this view)
+            // Date and Member filtering is now handled by the provider/backend
+            return !e.isSettlement && e.category.toLowerCase() != 'payment';
+          }).toList();
           if (items.isEmpty) {
             return RefreshIndicator(
               onRefresh: () async {
@@ -90,135 +90,164 @@ class ExpensesListScreen extends ConsumerWidget {
             onRefresh: () async {
               return await ref.refresh(expensesFutureProvider(groupId).future);
             },
-            child: ListView.builder(
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                // Find current user's member ID
-                final user = ref.watch(authControllerProvider).value;
-                final myMember = membersAsync.value?.firstWhere(
-                  (m) => m.userId == user?.id,
-                  orElse: () => Member(id: -1, groupId: groupId, name: ''),
-                );
-                final myMemberId = myMember?.id;
-
-                final isPayer = item.payerId == myMemberId;
-                final isInvolved = item.splits.any(
-                  (s) => s.memberId == myMemberId,
-                );
-
-                Color amountColor;
-                if (isInvolved && !isPayer) {
-                  amountColor = Colors.red;
-                } else if (isPayer) {
-                  amountColor = Colors.green;
-                } else {
-                  amountColor = Theme.of(context).colorScheme.primary;
-                }
-
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.tertiaryContainer,
-                    child: Text(CurrencyUtils.getSymbol(groupCurrency)),
-                  ),
-                  title: Text(
-                    item.description,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+            child: Column(
+              children: [
+                // Filters Section
+                // Filters container removed
+                if (items.isEmpty)
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        allExpenses.isEmpty
+                            ? 'No expenses yet. Add one!'
+                            : 'No expenses match filters.',
+                      ),
                     ),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Container(
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade100,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.blue.shade300),
-                            ),
-                            child: Text(
-                              (item.payments.length > 1)
-                                  ? 'Paid by ${item.payments.length} people'
-                                  : 'Paid by ${item.payer?.name ?? 'Unknown'}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue.shade800,
-                              ),
+                  )
+                else
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        // Find current user's member ID
+                        final user = ref.watch(authControllerProvider).value;
+                        final myMember = membersAsync.value?.firstWhere(
+                          (m) => m.userId == user?.id,
+                          orElse: () =>
+                              Member(id: -1, groupId: groupId, name: ''),
+                        );
+                        final myMemberId = myMember?.id;
+
+                        final isPayer = item.payerId == myMemberId;
+                        final isInvolved = item.splits.any(
+                          (s) => s.memberId == myMemberId,
+                        );
+
+                        Color amountColor;
+                        if (isInvolved && !isPayer) {
+                          amountColor = Colors.red;
+                        } else if (isPayer) {
+                          amountColor = Colors.green;
+                        } else {
+                          amountColor = Theme.of(context).colorScheme.primary;
+                        }
+
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.tertiaryContainer,
+                            child: Text(CurrencyUtils.getSymbol(groupCurrency)),
+                          ),
+                          title: Text(
+                            item.description,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
                           ),
-                        ],
-                      ),
-                      // Show small avatars for splits
-                      if (item.splits.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            const Text(
-                              "Split: ",
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            ...item.splits
-                                .map((split) {
-                                  // Find member name/initials
-                                  final matches = membersAsync.value?.where(
-                                    (m) => m.id == split.memberId,
-                                  );
-                                  final member =
-                                      (matches != null && matches.isNotEmpty)
-                                      ? matches.first
-                                      : null;
-                                  if (member == null) return const SizedBox();
-
-                                  return Padding(
-                                    padding: const EdgeInsets.only(right: 2.0),
-                                    child: Tooltip(
-                                      message: member.name,
-                                      child: UserAvatar(
-                                        radius: 8,
-                                        avatarUrl: member.avatarUrl,
-                                        name: member.name,
-                                        heroTag:
-                                            'expense_${item.id}_split_list_${member.id}',
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Container(
+                                    margin: const EdgeInsets.only(right: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.shade100,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: Colors.blue.shade300,
                                       ),
                                     ),
-                                  );
-                                })
-                                .take(5), // Limit to 5
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                  trailing: Text(
-                    item.amount.toStringAsFixed(2),
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: amountColor,
-                      fontWeight: FontWeight.bold,
+                                    child: Text(
+                                      (item.payments.length > 1)
+                                          ? 'Paid by ${item.payments.length} people'
+                                          : 'Paid by ${item.payer?.name ?? 'Unknown'}',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blue.shade800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              // Show small avatars for splits
+                              if (item.splits.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    const Text(
+                                      "Split: ",
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                    ...item.splits
+                                        .map((split) {
+                                          // Find member name/initials
+                                          final matches = membersAsync.value
+                                              ?.where(
+                                                (m) => m.id == split.memberId,
+                                              );
+                                          final member =
+                                              (matches != null &&
+                                                  matches.isNotEmpty)
+                                              ? matches.first
+                                              : null;
+                                          if (member == null) {
+                                            return const SizedBox();
+                                          }
+
+                                          return Padding(
+                                            padding: const EdgeInsets.only(
+                                              right: 2.0,
+                                            ),
+                                            child: Tooltip(
+                                              message: member.name,
+                                              child: UserAvatar(
+                                                radius: 8,
+                                                avatarUrl: member.avatarUrl,
+                                                name: member.name,
+                                                heroTag:
+                                                    'expense_${item.id}_split_list_${member.id}',
+                                              ),
+                                            ),
+                                          );
+                                        })
+                                        .take(5), // Limit to 5
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                          trailing: Text(
+                            item.amount.toStringAsFixed(2),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: amountColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                          onTap: () => _showExpenseDetails(
+                            context,
+                            ref,
+                            item,
+                            membersAsync.value ?? [],
+                          ),
+                        );
+                      },
                     ),
                   ),
-                  onTap: () => _showExpenseDetails(
-                    context,
-                    ref,
-                    item,
-                    membersAsync.value ?? [],
-                  ),
-                );
-              },
+              ],
             ),
           );
         },
