@@ -78,10 +78,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   void _handleRegisterNext() {
-    if (_passwordController.text.length < 6) {
+    if (_passwordController.text.length < 8) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password must be at least 6 characters')),
+        const SnackBar(content: Text('Password must be at least 8 characters')),
       );
+      return;
+    }
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
       return;
     }
     setState(() => _step = 2);
