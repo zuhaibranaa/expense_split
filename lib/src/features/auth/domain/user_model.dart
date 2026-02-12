@@ -7,6 +7,7 @@ class User {
   final String? phone;
   final String? iban;
   final bool isVerified;
+  final bool hasPassword;
 
   User({
     required this.id,
@@ -17,6 +18,7 @@ class User {
     this.phone,
     this.iban,
     this.isVerified = false,
+    this.hasPassword = true,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -29,6 +31,7 @@ class User {
       phone: json['phone'],
       iban: json['iban'],
       isVerified: json['is_verified'] == 1 || json['is_verified'] == true,
+      hasPassword: json['has_password'] ?? true,
     );
   }
   Map<String, dynamic> toJson() {
@@ -41,6 +44,7 @@ class User {
       'phone': phone,
       'iban': iban,
       'is_verified': isVerified,
+      'has_password': hasPassword,
     };
   }
 }

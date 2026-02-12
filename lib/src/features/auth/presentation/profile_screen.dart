@@ -126,7 +126,8 @@ class ProfileScreen extends ConsumerWidget {
                   leading: const Icon(Icons.lock),
                   title: const Text("Change Password"),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _showChangePasswordDialog(context, ref),
+                  onTap: () =>
+                      _showChangePasswordDialog(context, ref, user.hasPassword),
                 ),
 
                 const SizedBox(height: 24),
@@ -383,7 +384,11 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  void _showChangePasswordDialog(BuildContext context, WidgetRef ref) {
+  void _showChangePasswordDialog(
+    BuildContext context,
+    WidgetRef ref,
+    bool hasPassword,
+  ) {
     final currentPasswordController = TextEditingController();
     final passwordController = TextEditingController();
     final confirmController = TextEditingController();
@@ -404,22 +409,24 @@ class ProfileScreen extends ConsumerWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    TextFormField(
-                      controller: currentPasswordController,
-                      obscureText: true,
-                      autofocus: true,
-                      decoration: const InputDecoration(
-                        labelText: "Current Password",
-                        border: OutlineInputBorder(),
+                    if (hasPassword) ...[
+                      TextFormField(
+                        controller: currentPasswordController,
+                        obscureText: true,
+                        autofocus: true,
+                        decoration: const InputDecoration(
+                          labelText: "Current Password",
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return "Please enter your current password";
+                          }
+                          return null;
+                        },
                       ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return "Please enter your current password";
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 16),
+                    ],
                     TextFormField(
                       controller: passwordController,
                       obscureText: true,
@@ -485,8 +492,9 @@ class ProfileScreen extends ConsumerWidget {
                             await ref
                                 .read(authControllerProvider.notifier)
                                 .updateProfile(
-                                  currentPassword:
-                                      currentPasswordController.text,
+                                  currentPassword: hasPassword
+                                      ? currentPasswordController.text
+                                      : null,
                                   password: passwordController.text,
                                   passwordConfirmation: confirmController.text,
                                   shouldHandleError: false,
@@ -511,7 +519,8 @@ class ProfileScreen extends ConsumerWidget {
                                 errorText = msg;
                                 isLoading = false;
                                 // Clear current password field on error as it might be wrong
-                                if (msg.toLowerCase().contains("password")) {
+                                if (msg.toLowerCase().contains("password") &&
+                                    hasPassword) {
                                   currentPasswordController.clear();
                                 }
                               });

@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
 import '../../../shared/data/api_client.dart';
 import '../domain/user_model.dart';
-
 import '../../../shared/services/notification_service.dart';
 
 // Use SharedPreferences instead of FlutterSecureStorage for web compatibility
@@ -15,6 +15,7 @@ const _kUserIdKey = 'user_id';
 class AuthRepository {
   final ApiClient _api;
   final NotificationService _notificationService;
+
   User? _currentUser;
 
   AuthRepository(this._api, this._notificationService);
@@ -95,6 +96,75 @@ class AuthRepository {
     _currentUser = User.fromJson(userMap);
     await _saveSession(_currentUser!);
     await _updateFcmToken();
+    _currentUser = User.fromJson(userMap);
+    await _saveSession(_currentUser!);
+    await _updateFcmToken();
+  }
+
+  Future<void> signInWithGoogle() async {
+    try {
+      // On Web, the sign-in is handled by the renderButton and onCurrentUserChanged stream.
+      // Calling authenticate() on web throws UnimplementedError.
+      if (!kIsWeb) {
+        final googleUser = await GoogleSignIn.instance.authenticate(
+          scopeHint: ['email'],
+        );
+        // authenticate throws on cancel/fail, so we proceed assuming success
+        // The listener will handle the actual auth logic if we unify specific logic,
+        // but typically authenticate() returns the user too.
+        // However, to unify with Web (which uses listener), we could rely on listener for both?
+        // OR just handle mobile here and web in listener.
+        // Let's handle mobile here as before, and Web via listener.
+        await handleGoogleAuth(googleUser);
+      }
+    } catch (e) {
+      // Check for GoogleSignInException
+      if (e is GoogleSignInException &&
+          e.code == GoogleSignInExceptionCode.canceled) {
+        return; // User canceled
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> handleGoogleAuth(GoogleSignInAccount googleUser) async {
+    try {
+      // Analyzer suggests authentication is not a Future here, so we access it directly.
+      // If this causes a runtime error, it should be reverted to 'await'.
+      final dynamic auth = googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth = auth is Future
+          ? await auth
+          : auth;
+      final idToken = googleAuth.idToken;
+
+      if (idToken == null) {
+        throw Exception('Failed to get Google ID Token');
+      }
+
+      final response = await _api.post('/auth/login/google', {
+        'id_token': idToken,
+      }, shouldHandleError: false);
+
+      final token = response['access_token'];
+      final userMap = response['user'];
+
+      if (token != null) {
+        _api.setToken(token);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', token);
+      }
+
+      _currentUser = User.fromJson(userMap);
+      await _saveSession(_currentUser!);
+      await _updateFcmToken();
+    } catch (e) {
+      // Check for GoogleSignInException
+      if (e is GoogleSignInException &&
+          e.code == GoogleSignInExceptionCode.canceled) {
+        return; // User canceled
+      }
+      rethrow;
+    }
   }
 
   Future<void> register(
@@ -273,6 +343,29 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
 
   Future<void> _init() async {
     final repo = ref.read(authRepositoryProvider);
+
+    if (kIsWeb) {
+      GoogleSignIn.instance.authenticationEvents.listen((event) async {
+        // Use dynamic to access properties safely without importing specific event classes
+        final dynamic dynamicEvent = event;
+        try {
+          // Check for 'user' property which exists on GoogleSignInAuthenticationEventSignIn
+          // We use a try-catch block for property access as a safe check
+          final user = dynamicEvent.user;
+          if (user != null && user is GoogleSignInAccount) {
+            try {
+              await repo.handleGoogleAuth(user);
+              state = AsyncValue.data(repo.currentUser);
+            } catch (e) {
+              state = AsyncValue.error(e, StackTrace.current);
+            }
+          }
+        } catch (_) {
+          // Property 'user' might not exist on other event types, ignore those events
+        }
+      });
+    }
+
     final user = await repo.restoreSession();
     state = AsyncValue.data(user);
   }
@@ -294,6 +387,12 @@ class AuthController extends StateNotifier<AsyncValue<User?>> {
     final repo = ref.read(authRepositoryProvider);
     // Do not set global loading state here to prevent UI reset
     await repo.register(email, password, confirmPassword, name, currency);
+    state = AsyncValue.data(repo.currentUser);
+  }
+
+  Future<void> signInWithGoogle() async {
+    final repo = ref.read(authRepositoryProvider);
+    await repo.signInWithGoogle();
     state = AsyncValue.data(repo.currentUser);
   }
 
