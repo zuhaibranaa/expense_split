@@ -4,7 +4,12 @@ import '../domain/expense_model.dart';
 import '../data/expenses_repository.dart';
 
 final expenseDateRangeFilterProvider =
-    StateProvider.family<DateTimeRange?, int>((ref, groupId) => null);
+    StateProvider.family<DateTimeRange?, int>((ref, groupId) {
+      final now = DateTime.now();
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0);
+      return DateTimeRange(start: startOfMonth, end: endOfMonth);
+    });
 
 final expenseUserFilterProvider = StateProvider.family<int?, int>(
   (ref, groupId) => null,

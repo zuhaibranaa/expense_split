@@ -125,9 +125,10 @@ class _FilterActionButtonState extends State<_FilterActionButton> {
         // 2: Balances - No Date, Simplify Toggle
         // 4: Stats - Month Picker, No Member Filter
 
-        final showDate = index != 2; // Hide date on Balances
+        final showDate = index != 2 || index == 2; // Show date on Balances too
         final showSimplify = index == 2; // Show simplify on Balances
         final isStats = index == 4;
+        final isBalances = index == 2;
 
         showModalBottomSheet(
           context: context,
@@ -138,7 +139,8 @@ class _FilterActionButtonState extends State<_FilterActionButton> {
             showDateFilter: showDate,
             showSimplifyDebts: showSimplify,
             showMemberFilter: !isStats, // Hide member filter on Stats
-            useMonthPicker: isStats, // Use month picker on Stats
+            useMonthPicker:
+                isStats || isBalances, // Use month picker on Stats AND Balances
           ),
         );
       },

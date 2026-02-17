@@ -23,7 +23,7 @@ class BalancesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // USE unfiltered provider for balances so logic is always over ALL expenses
     // Filters are applied LOCALLY to the result
-    final expensesAsync = ref.watch(unfilteredExpensesFutureProvider(groupId));
+    final expensesAsync = ref.watch(expensesFutureProvider(groupId));
     final membersAsync = ref.watch(allMembersFutureProvider(groupId));
     final minimize = ref.watch(minimizeDebtsProvider(groupId));
     final selectedUserId = ref.watch(expenseUserFilterProvider(groupId));
@@ -59,7 +59,7 @@ class BalancesScreen extends ConsumerWidget {
             return RefreshIndicator(
               onRefresh: () async {
                 final future1 = ref.refresh(
-                  unfilteredExpensesFutureProvider(groupId).future,
+                  expensesFutureProvider(groupId).future,
                 );
                 final future2 = ref.refresh(
                   allMembersFutureProvider(groupId).future,
@@ -83,7 +83,7 @@ class BalancesScreen extends ConsumerWidget {
                 onRefresh: () async {
                   // Refresh both dependencies
                   final future1 = ref.refresh(
-                    unfilteredExpensesFutureProvider(groupId).future,
+                    expensesFutureProvider(groupId).future,
                   );
                   final future2 = ref.refresh(
                     allMembersFutureProvider(groupId).future,

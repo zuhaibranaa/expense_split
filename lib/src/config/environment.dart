@@ -5,8 +5,8 @@ class Environment {
       'https://stagging-api.equisplit.click/api/';
   static const String _prodWsBaseUrl = 'ws://stagging-api.equisplit.click';
 
-  static const String _devApiBaseUrl = 'http://192.168.1.3:8000/api/';
-  static const String _devWsBaseUrl = 'ws://192.168.1.3:8000';
+  static const String _devApiBaseUrl = 'http://192.168.1.14:8000/api/';
+  static const String _devWsBaseUrl = 'ws://192.168.1.14:8000';
 
   static const String _androidDevApiBaseUrl =
       'https://stagging-api.equisplit.click/api/';

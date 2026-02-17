@@ -297,7 +297,7 @@ class GlobalSettlementsScreen extends ConsumerWidget {
                             ],
                           ),
                         ],
-                        if (isOwesMe) ...[
+                        if (isOwesMe && item.other.hasFcmToken) ...[
                           const SizedBox(height: 16),
                           Row(
                             children: [

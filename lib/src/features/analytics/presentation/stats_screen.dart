@@ -5,6 +5,7 @@ import 'package:equisplit/src/features/groups/data/groups_repository.dart';
 import 'package:equisplit/src/features/expenses/data/expenses_repository.dart';
 import 'package:equisplit/src/features/expenses/domain/expense_model.dart';
 import 'package:equisplit/src/features/auth/data/auth_repository.dart';
+import 'package:intl/intl.dart';
 
 class StatsScreen extends ConsumerWidget {
   const StatsScreen({super.key});
@@ -42,22 +43,26 @@ class _StatsContent extends ConsumerStatefulWidget {
 }
 
 class _StatsContentState extends ConsumerState<_StatsContent> {
-  int _periodIndex =
-      2; // 0: Month, 1: Quarter, 2: Year DEFAULTS to YEAR as per screenshot
+  late DateTimeRange _selectedDateRange;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _selectedDateRange = DateTimeRange(
+      start: DateTime(now.year, now.month, 1),
+      end: DateTime(now.year, now.month + 1, 0),
+    );
+  }
 
   List<Expense> _filterExpenses(List<Expense> expenses) {
-    if (_periodIndex == 2) return expenses;
-
-    final now = DateTime.now();
     return expenses.where((e) {
-      if (_periodIndex == 0) {
-        return e.date.year == now.year && e.date.month == now.month;
-      } else if (_periodIndex == 1) {
-        final currentQuarter = ((now.month - 1) / 3).floor();
-        final expenseQuarter = ((e.date.month - 1) / 3).floor();
-        return e.date.year == now.year && currentQuarter == expenseQuarter;
-      }
-      return true;
+      return e.date.isAfter(
+            _selectedDateRange.start.subtract(const Duration(seconds: 1)),
+          ) &&
+          e.date.isBefore(
+            _selectedDateRange.end.add(const Duration(seconds: 1)),
+          );
     }).toList();
   }
 
@@ -99,29 +104,60 @@ class _StatsContentState extends ConsumerState<_StatsContent> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // Period Selector using Segmented Button styled manually or standard
-                ToggleButtons(
-                  isSelected: [
-                    _periodIndex == 0,
-                    _periodIndex == 1,
-                    _periodIndex == 2,
-                  ],
-                  onPressed: (index) => setState(() => _periodIndex = index),
-                  borderRadius: BorderRadius.circular(20),
-                  children: const [
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: Text('Month'),
+                // Date Selection Pill
+                Center(
+                  child: InkWell(
+                    onTap: () async {
+                      final picked = await showDateRangePicker(
+                        context: context,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                        initialDateRange: _selectedDateRange,
+                      );
+
+                      if (picked != null) {
+                        setState(() {
+                          _selectedDateRange = picked;
+                        });
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.calendar_today,
+                            size: 16,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _getPeriodLabel(),
+                            style: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ],
+                      ),
                     ),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: Text('Quarter'),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: Text('Year'),
-                    ),
-                  ],
+                  ),
                 ),
                 const SizedBox(height: 24),
 
@@ -315,6 +351,12 @@ class _StatsContentState extends ConsumerState<_StatsContent> {
       default:
         return Colors.lightBlue;
     }
+  }
+
+  String _getPeriodLabel() {
+    final start = DateFormat.MMMEd().format(_selectedDateRange.start);
+    final end = DateFormat.MMMEd().format(_selectedDateRange.end);
+    return '$start - $end';
   }
 }
 

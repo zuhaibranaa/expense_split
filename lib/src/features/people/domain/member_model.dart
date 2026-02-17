@@ -8,6 +8,7 @@ class Member {
   final String? avatarUrl;
   final String? email;
   final String? phone;
+  final bool hasFcmToken;
 
   Member({
     required this.id,
@@ -19,6 +20,7 @@ class Member {
     this.avatarUrl,
     this.email,
     this.phone,
+    this.hasFcmToken = false,
   });
 
   factory Member.fromJson(Map<String, dynamic> json) {
@@ -42,6 +44,7 @@ class Member {
       avatarUrl: user != null ? user['avatar_url'] : null,
       email: user != null ? user['email'] : null,
       phone: user != null ? user['phone'] : null,
+      hasFcmToken: user != null && user['fcm_token'] != null,
     );
   }
 }
