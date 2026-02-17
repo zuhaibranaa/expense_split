@@ -26,7 +26,9 @@ class GroupsListScreen extends ConsumerWidget {
         ],
       ),
       body: groupsAsync.when(
-        data: (groups) {
+        data: (allGroups) {
+          final groups = allGroups.where((g) => g.type != 'PERSONAL').toList();
+
           if (groups.isEmpty) {
             return RefreshIndicator(
               onRefresh: () async {

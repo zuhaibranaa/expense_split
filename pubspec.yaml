@@ -60,6 +60,7 @@ dependencies:
   pusher_channels_flutter: ^2.2.1
   firebase_messaging: ^15.2.0
   google_sign_in_web: ^1.1.0
+  emoji_picker_flutter: ^4.4.0
 
 dev_dependencies:
   flutter_test:

@@ -25,7 +25,13 @@ class StatsScreen extends ConsumerWidget {
 
           // 2. Fetch Expenses for All Groups (MVP Approach: Client-side Aggregation)
           // In a real app, use a dedicated endpoint /stats
-          return _StatsContent(groupIds: groups.map((g) => g.id).toList());
+          // Filter out PERSONAL groups
+          final regularGroups = groups
+              .where((g) => g.type != 'PERSONAL')
+              .toList();
+          return _StatsContent(
+            groupIds: regularGroups.map((g) => g.id).toList(),
+          );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, st) => Center(child: Text('Error: $e')),

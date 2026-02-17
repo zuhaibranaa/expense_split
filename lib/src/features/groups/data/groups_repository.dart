@@ -127,6 +127,7 @@ class GroupsNotifier extends AutoDisposeAsyncNotifier<List<Group>> {
               name: name ?? g.name,
               currency: currency ?? g.currency,
               createdAt: g.createdAt,
+              type: g.type,
               // creatorUserId: g.creatorUserId, // Removed as it's not in model or needed for optimistic
             );
           }

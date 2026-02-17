@@ -15,11 +15,13 @@ import 'package:equisplit/src/shared/presentation/widgets/user_avatar.dart';
 class ExpensesListScreen extends ConsumerWidget {
   final int groupId;
   final String groupCurrency; // Add group currency
+  final bool isPersonal;
 
   const ExpensesListScreen({
     super.key,
     required this.groupId,
     required this.groupCurrency,
+    this.isPersonal = false,
   });
 
   @override
@@ -49,6 +51,7 @@ class ExpensesListScreen extends ConsumerWidget {
     // });
 
     return Scaffold(
+      appBar: null,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           Navigator.of(context).push(
@@ -56,6 +59,7 @@ class ExpensesListScreen extends ConsumerWidget {
               builder: (context) => AddExpenseScreen(
                 groupId: groupId,
                 groupCurrency: groupCurrency,
+                isPersonal: isPersonal,
               ),
             ),
           );
@@ -153,34 +157,32 @@ class ExpensesListScreen extends ConsumerWidget {
                               const SizedBox(height: 4),
                               Row(
                                 children: [
+                                  // Category Pill (Always Visible, Green)
                                   Container(
-                                    margin: const EdgeInsets.only(right: 8),
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 8,
                                       vertical: 2,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.blue.shade100,
+                                      color: Colors.green.shade100,
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
-                                        color: Colors.blue.shade300,
+                                        color: Colors.green.shade300,
                                       ),
                                     ),
                                     child: Text(
-                                      (item.payments.length > 1)
-                                          ? 'Paid by ${item.payments.length} people'
-                                          : 'Paid by ${item.payer?.name ?? 'Unknown'}',
+                                      item.category,
                                       style: TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.blue.shade800,
+                                        color: Colors.green.shade800,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
-                              // Show small avatars for splits
-                              if (item.splits.isNotEmpty) ...[
+                              // Splits (Only for Non-Personal)
+                              if (!isPersonal && item.splits.isNotEmpty) ...[
                                 const SizedBox(height: 6),
                                 Row(
                                   children: [
@@ -229,19 +231,39 @@ class ExpensesListScreen extends ConsumerWidget {
                               ],
                             ],
                           ),
-                          trailing: Text(
-                            item.amount.toStringAsFixed(2),
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(
-                                  color: amountColor,
-                                  fontWeight: FontWeight.bold,
+                          trailing: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (!isPersonal) ...[
+                                Text(
+                                  (item.payments.length > 1)
+                                      ? 'Paid by ${item.payments.length}'
+                                      : 'Paid by ${item.payer?.name ?? 'Unknown'}',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.white70,
+                                  ),
                                 ),
+                                const SizedBox(height: 4),
+                              ],
+                              Text(
+                                item.amount.toStringAsFixed(2),
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      color: amountColor,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                              ),
+                            ],
                           ),
                           onTap: () => _showExpenseDetails(
                             context,
                             ref,
                             item,
                             membersAsync.value ?? [],
+                            isPersonal, // Pass isPersonal
                           ),
                         );
                       },
@@ -262,6 +284,7 @@ class ExpensesListScreen extends ConsumerWidget {
     WidgetRef ref,
     Expense expense,
     List<Member> members,
+    bool isPersonal,
   ) {
     final user = ref.read(authControllerProvider).value;
 
@@ -293,7 +316,7 @@ class ExpensesListScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
 
-            // Icon and Amount
+            // Icon and Description
             Row(
               children: [
                 Container(
@@ -322,6 +345,28 @@ class ExpensesListScreen extends ConsumerWidget {
                               fontWeight: FontWeight.bold,
                               color: Theme.of(context).colorScheme.onSurface,
                             ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Category Pill
+                      // Category Pill (Blue/PaidBy Style in Detail Modal)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.blue.shade300),
+                        ),
+                        child: Text(
+                          expense.category,
+                          style: TextStyle(
+                            fontSize: 12, // Slightly larger than list (10)
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade800,
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -374,134 +419,141 @@ class ExpensesListScreen extends ConsumerWidget {
 
             const SizedBox(height: 32),
 
-            // People Involved
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Payer
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildSectionLabel(context, 'PAID BY'),
-                      const SizedBox(height: 12),
-                      if (expense.payments.length > 1)
-                        Wrap(
-                          spacing: -8,
-                          runSpacing: 8,
-                          children: expense.payments.map((p) {
-                            final member = members.firstWhere(
-                              (m) => m.id == p.memberId,
-                              orElse: () =>
-                                  Member(id: -1, groupId: -1, name: 'Unknown'),
-                            );
-                            return Tooltip(
-                              message:
-                                  '${member.name}: ${CurrencyUtils.getSymbol(groupCurrency)}${p.amount.toStringAsFixed(2)}',
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.surface,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: _buildAvatar(
-                                  member.name,
-                                  member.avatarUrl,
-                                  radius: 18,
-                                  heroTag:
-                                      'expense_${expense.id}_payment_detail_${member.id}',
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        )
-                      else
-                        _buildPersonCard(
-                          context,
-                          members
-                              .firstWhere(
-                                (m) => m.id == expense.payerId,
+            if (!isPersonal) ...[
+              const SizedBox(height: 32),
+
+              // People Involved
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Payer
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionLabel(context, 'PAID BY'),
+                        const SizedBox(height: 12),
+                        if (expense.payments.length > 1)
+                          Wrap(
+                            spacing: -8,
+                            runSpacing: 8,
+                            children: expense.payments.map((p) {
+                              final member = members.firstWhere(
+                                (m) => m.id == p.memberId,
                                 orElse: () => Member(
                                   id: -1,
                                   groupId: -1,
-                                  name: expense.payer?.name ?? 'Unknown',
+                                  name: 'Unknown',
                                 ),
-                              )
-                              .name,
-                          members
-                              .firstWhere(
-                                (m) => m.id == expense.payerId,
-                                orElse: () => Member(
-                                  id: -1,
-                                  groupId: -1,
-                                  name: expense.payer?.name ?? 'Unknown',
-                                ),
-                              )
-                              .avatarUrl,
-                          isPayer: true,
-                          heroTag:
-                              'expense_${expense.id}_payer_detail_${expense.payerId}',
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // Split With
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildSectionLabel(context, 'SPLIT WITH'),
-                      const SizedBox(height: 12),
-                      // Stacked avatars or list
-                      if (expense.splits.isEmpty)
-                        Text(
-                          'No splits',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        )
-                      else
-                        Wrap(
-                          spacing: -8,
-                          runSpacing: 8,
-                          children: expense.splits.map((split) {
-                            final memberValue = members.firstWhere(
-                              (m) => m.id == split.memberId,
-                              orElse: () =>
-                                  Member(id: -1, groupId: -1, name: 'User'),
-                            );
-                            return Tooltip(
-                              message:
-                                  '${memberValue.name}: ${CurrencyUtils.getSymbol(groupCurrency)}${split.amount.toStringAsFixed(2)}',
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.surface,
-                                    width: 2,
+                              );
+                              return Tooltip(
+                                message:
+                                    '${member.name}: ${CurrencyUtils.getSymbol(groupCurrency)}${p.amount.toStringAsFixed(2)}',
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.surface,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: _buildAvatar(
+                                    member.name,
+                                    member.avatarUrl,
+                                    radius: 18,
+                                    heroTag:
+                                        'expense_${expense.id}_payment_detail_${member.id}',
                                   ),
                                 ),
-                                child: _buildAvatar(
-                                  memberValue.name,
-                                  memberValue.avatarUrl,
-                                  radius: 18,
-                                  heroTag:
-                                      'expense_${expense.id}_split_detail_${memberValue.id}',
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                    ],
+                              );
+                            }).toList(),
+                          )
+                        else
+                          _buildPersonCard(
+                            context,
+                            members
+                                .firstWhere(
+                                  (m) => m.id == expense.payerId,
+                                  orElse: () => Member(
+                                    id: -1,
+                                    groupId: -1,
+                                    name: expense.payer?.name ?? 'Unknown',
+                                  ),
+                                )
+                                .name,
+                            members
+                                .firstWhere(
+                                  (m) => m.id == expense.payerId,
+                                  orElse: () => Member(
+                                    id: -1,
+                                    groupId: -1,
+                                    name: expense.payer?.name ?? 'Unknown',
+                                  ),
+                                )
+                                .avatarUrl,
+                            isPayer: true,
+                            heroTag:
+                                'expense_${expense.id}_payer_detail_${expense.payerId}',
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
+                  const SizedBox(width: 16),
+                  // Split With
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionLabel(context, 'SPLIT WITH'),
+                        const SizedBox(height: 12),
+                        // Stacked avatars or list
+                        if (expense.splits.isEmpty)
+                          Text(
+                            'No splits',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          )
+                        else
+                          Wrap(
+                            spacing: -8,
+                            runSpacing: 8,
+                            children: expense.splits.map((split) {
+                              final memberValue = members.firstWhere(
+                                (m) => m.id == split.memberId,
+                                orElse: () =>
+                                    Member(id: -1, groupId: -1, name: 'User'),
+                              );
+                              return Tooltip(
+                                message:
+                                    '${memberValue.name}: ${CurrencyUtils.getSymbol(groupCurrency)}${split.amount.toStringAsFixed(2)}',
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.surface,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: _buildAvatar(
+                                    memberValue.name,
+                                    memberValue.avatarUrl,
+                                    radius: 18,
+                                    heroTag:
+                                        'expense_${expense.id}_split_detail_${memberValue.id}',
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
 
             const SizedBox(height: 40),
 
@@ -583,6 +635,7 @@ class ExpensesListScreen extends ConsumerWidget {
                             groupId: groupId,
                             groupCurrency: groupCurrency,
                             expense: expense,
+                            isPersonal: isPersonal, // Pass isPersonal
                           ),
                         ),
                       );

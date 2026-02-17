@@ -2,75 +2,177 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../groups/presentation/groups_list_screen.dart';
 import '../../auth/presentation/profile_screen.dart';
+import '../../groups/presentation/group_detail_screen.dart';
 import '../../analytics/presentation/stats_screen.dart';
 import '../../analytics/presentation/global_settlements_screen.dart';
-import '../../auth/data/auth_repository.dart';
+import '../../groups/data/groups_repository.dart';
 
-class MainScreen extends ConsumerStatefulWidget {
+class MainScreen extends ConsumerWidget {
   const MainScreen({super.key});
 
   @override
-  ConsumerState<MainScreen> createState() => _MainScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final groupsAsync = ref.watch(groupsListProvider);
 
-class _MainScreenState extends ConsumerState<MainScreen> {
-  int _currentIndex = 0;
+    return Scaffold(
+      appBar: AppBar(title: const Text('EquiSplit'), centerTitle: true),
+      body: groupsAsync.when(
+        data: (groups) {
+          final personalGroup = groups.cast<dynamic>().firstWhere(
+            (g) => g.type == 'PERSONAL',
+            orElse: () => null,
+          );
 
-  final List<Widget> _screens = [
-    const GroupsListScreen(), // Home
-    const StatsScreen(), // Stats
-    const GlobalSettlementsScreen(), // Settlements
-    const ProfileScreen(), // Profile
-  ];
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                // 1. Personal Expense Card (Full Width)
+                if (personalGroup != null)
+                  _buildCard(
+                    context,
+                    title: 'Personal Expenses',
+                    icon: Icons.person,
+                    color: Colors.blueAccent,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (ctx) =>
+                              GroupDetailScreen(group: personalGroup),
+                        ),
+                      );
+                    },
+                    isFullWidth: true,
+                  ),
+                if (personalGroup != null) const SizedBox(height: 16),
 
-  @override
-  void initState() {
-    super.initState();
-    // Connect to WebSocket after build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final user = ref.read(authControllerProvider).value;
-      if (user != null) {
-        // ref.read(webSocketServiceProvider).connect(user.id);
-      }
-    });
+                // Grid for others
+                GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: 1.1,
+                  children: [
+                    // 2. Expense Groups
+                    _buildCard(
+                      context,
+                      title: 'Groups',
+                      icon: Icons.group,
+                      color: Colors.purpleAccent,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (ctx) => const GroupsListScreen(),
+                          ),
+                        );
+                      },
+                    ),
+
+                    // 3. Global Stats
+                    _buildCard(
+                      context,
+                      title: 'Global Stats',
+                      icon: Icons.pie_chart,
+                      color: Colors.orangeAccent,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (ctx) => const StatsScreen(),
+                          ),
+                        );
+                      },
+                    ),
+
+                    // 4. Global Settlements
+                    _buildCard(
+                      context,
+                      title: 'Settlements',
+                      icon: Icons.account_balance_wallet,
+                      color: Colors.greenAccent,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (ctx) => const GlobalSettlementsScreen(),
+                          ),
+                        );
+                      },
+                    ),
+
+                    // 5. Profile
+                    _buildCard(
+                      context,
+                      title: 'Profile',
+                      icon: Icons.person_outline,
+                      color: Colors.grey,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (ctx) => const ProfileScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, st) => Center(child: Text('Error: $err')),
+      ),
+    );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
-          if (index == 3) {
-            ref.read(authControllerProvider.notifier).reloadUser();
-          }
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
+  Widget _buildCard(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    bool isFullWidth = false,
+  }) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          width: isFullWidth ? double.infinity : null,
+          height: isFullWidth ? 120 : null,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              colors: [color.withValues(alpha: 0.7), color],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.pie_chart_outline),
-            selectedIcon: Icon(Icons.pie_chart),
-            label: 'Stats',
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 40, color: Colors.white),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
-          NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet),
-            label: 'Settlements',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
+        ),
       ),
     );
   }

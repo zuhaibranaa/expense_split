@@ -16,14 +16,43 @@ class GroupDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isPersonal = group.type == 'PERSONAL';
+
+    // Tabs configuration
+    final tabs = [
+      const Tab(text: 'Expenses'),
+      if (!isPersonal) const Tab(text: 'Payments'),
+      if (!isPersonal) const Tab(text: 'Balances'),
+      if (!isPersonal) const Tab(text: 'People'),
+      const Tab(text: 'Stats'),
+      const Tab(text: 'Settings'),
+    ];
+
+    final children = [
+      ExpensesListScreen(
+        groupId: group.id,
+        groupCurrency: group.currency,
+        isPersonal: isPersonal,
+      ),
+      if (!isPersonal)
+        PaymentsListScreen(groupId: group.id, groupCurrency: group.currency),
+      if (!isPersonal)
+        BalancesScreen(groupId: group.id, groupCurrency: group.currency),
+      if (!isPersonal) MembersListView(groupId: group.id),
+      GroupStatsScreen(groupId: group.id, groupCurrency: group.currency),
+      GroupSettingsScreen(group: group),
+    ];
+
     return DefaultTabController(
-      length: 6, // Changed from 5 to 6
+      length: tabs.length,
       child: Builder(
         builder: (context) {
           return Scaffold(
             appBar: AppBar(
               title: Text(group.name),
-              actions: [_FilterActionButton(groupId: group.id)],
+              actions: [
+                _FilterActionButton(groupId: group.id, isPersonal: isPersonal),
+              ],
               bottom: TabBar(
                 isScrollable: true,
                 indicator: const UnderlineTabIndicator(
@@ -34,38 +63,10 @@ class GroupDetailScreen extends ConsumerWidget {
                 labelColor: const Color(0xFF00E5FF),
                 unselectedLabelColor: Colors.grey,
                 labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-                tabs: const [
-                  Tab(text: 'Expenses'),
-                  Tab(text: 'Payments'),
-                  Tab(text: 'Balances'),
-                  Tab(text: 'People'),
-                  Tab(text: 'Stats'),
-                  Tab(text: 'Settings'),
-                ],
+                tabs: tabs,
               ),
             ),
-            body: TabBarView(
-              children: [
-                ExpensesListScreen(
-                  groupId: group.id,
-                  groupCurrency: group.currency,
-                ),
-                PaymentsListScreen(
-                  groupId: group.id,
-                  groupCurrency: group.currency,
-                ),
-                BalancesScreen(
-                  groupId: group.id,
-                  groupCurrency: group.currency,
-                ),
-                MembersListView(groupId: group.id),
-                GroupStatsScreen(
-                  groupId: group.id,
-                  groupCurrency: group.currency,
-                ),
-                GroupSettingsScreen(group: group), // New settings screen
-              ],
-            ),
+            body: TabBarView(children: children),
           );
         },
       ),
@@ -75,8 +76,9 @@ class GroupDetailScreen extends ConsumerWidget {
 
 class _FilterActionButton extends StatefulWidget {
   final int groupId;
+  final bool isPersonal;
 
-  const _FilterActionButton({required this.groupId});
+  const _FilterActionButton({required this.groupId, this.isPersonal = false});
 
   @override
   State<_FilterActionButton> createState() => _FilterActionButtonState();
@@ -112,8 +114,27 @@ class _FilterActionButtonState extends State<_FilterActionButton> {
 
     final index = _tabController!.index;
 
-    // Hide on People (3) and Settings (5)
-    if (index == 3 || index == 5) {
+    // Logic depends on tab indices.
+    // If Personal: [Expenses, Stats, Settings] -> Indices: 0, 1, 2
+    // If Regular: [Exp, Pay, Bal, Ppl, Stats, Sets] -> Indices: 0, 1, 2, 3, 4, 5
+
+    bool isStats = false;
+    bool isSettings = false;
+    bool isPeople = false;
+    bool isBalances = false;
+
+    if (widget.isPersonal) {
+      if (index == 1) isStats = true;
+      if (index == 2) isSettings = true;
+    } else {
+      if (index == 4) isStats = true;
+      if (index == 5) isSettings = true;
+      if (index == 3) isPeople = true;
+      if (index == 2) isBalances = true;
+    }
+
+    // Hide on People and Settings
+    if (isPeople || isSettings) {
       return const SizedBox.shrink();
     }
 
@@ -121,14 +142,7 @@ class _FilterActionButtonState extends State<_FilterActionButton> {
       icon: const Icon(Icons.filter_list_rounded),
       onPressed: () {
         // Configure modal based on tab
-        // 0: Expenses, 1: Payments - Standard
-        // 2: Balances - No Date, Simplify Toggle
-        // 4: Stats - Month Picker, No Member Filter
-
-        final showDate = index != 2 || index == 2; // Show date on Balances too
-        final showSimplify = index == 2; // Show simplify on Balances
-        final isStats = index == 4;
-        final isBalances = index == 2;
+        final showSimplify = isBalances;
 
         showModalBottomSheet(
           context: context,
@@ -136,11 +150,12 @@ class _FilterActionButtonState extends State<_FilterActionButton> {
           backgroundColor: Colors.transparent,
           builder: (context) => FilterModal(
             groupId: widget.groupId,
-            showDateFilter: showDate,
+            showDateFilter: true, // Always show date
             showSimplifyDebts: showSimplify,
-            showMemberFilter: !isStats, // Hide member filter on Stats
-            useMonthPicker:
-                isStats || isBalances, // Use month picker on Stats AND Balances
+            showMemberFilter:
+                !isStats &&
+                !widget.isPersonal, // Hide member filter on Stats AND Personal
+            useMonthPicker: isStats || isBalances,
           ),
         );
       },

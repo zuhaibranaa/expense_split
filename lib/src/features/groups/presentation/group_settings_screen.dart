@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../categories/presentation/category_management_screen.dart';
 import 'package:currency_picker/currency_picker.dart';
 import '../domain/group_model.dart';
 import '../data/groups_repository.dart';
@@ -90,6 +91,25 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
                               },
                             ),
                           ),
+                          ListTile(
+                            leading: const Icon(Icons.category),
+                            title: const Text('Manage Categories'),
+                            subtitle: const Text('Add or remove categories'),
+                            trailing: const Icon(
+                              Icons.arrow_forward_ios,
+                              size: 16,
+                            ),
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      CategoryManagementScreen(
+                                        groupId: widget.group.id,
+                                      ),
+                                ),
+                              );
+                            },
+                          ),
                         ],
                       ),
                     ),
@@ -100,7 +120,8 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
                   FutureBuilder<bool>(
                     future: _isCurrentUserAdmin(),
                     builder: (context, snapshot) {
-                      if (snapshot.data == true) {
+                      if (snapshot.data == true &&
+                          widget.group.type != 'PERSONAL') {
                         return Card(
                           color: Colors.red.shade50,
                           child: Padding(

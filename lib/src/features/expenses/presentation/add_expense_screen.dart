@@ -8,12 +8,15 @@ import '../../auth/data/auth_repository.dart';
 import '../domain/expense_model.dart';
 import '../../../shared/utils/currency_utils.dart';
 import 'package:equisplit/src/shared/presentation/widgets/user_avatar.dart';
+import '../../categories/data/categories_repository.dart';
+import '../../categories/domain/category_model.dart';
 
 enum SplitMethod { equal, exact }
 
 class AddExpenseScreen extends ConsumerStatefulWidget {
   final int groupId;
   final String groupCurrency; // Add group currency
+  final bool isPersonal;
 
   final Expense? expense;
 
@@ -21,6 +24,7 @@ class AddExpenseScreen extends ConsumerStatefulWidget {
     super.key,
     required this.groupId,
     required this.groupCurrency,
+    this.isPersonal = false,
     this.expense,
   });
 
@@ -35,7 +39,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   bool _isMultiplePayers = false;
   final Map<int, TextEditingController> _payerControllers = {};
   final Set<int> _selectedPayerIds = {};
-  String _selectedCategory = 'General';
+  String? _selectedCategory;
+  List<Category> _categories = [];
 
   final Set<int> _selectedMemberIds = {};
   SplitMethod _splitMethod = SplitMethod.equal;
@@ -104,6 +109,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   @override
   Widget build(BuildContext context) {
     final membersAsync = ref.watch(membersFutureProvider(widget.groupId));
+    final categoriesAsync = ref.watch(groupCategoriesProvider(widget.groupId));
 
     return Scaffold(
       appBar: AppBar(title: const Text('New Expense')),
@@ -211,200 +217,239 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 const SizedBox(height: 16),
 
                 // Payer
-                if (!_isMultiplePayers)
-                  DropdownButtonFormField<int>(
-                    initialValue: _selectedPayerId,
-                    decoration: const InputDecoration(
-                      labelText: 'Paid By',
-                      prefixIcon: Icon(Icons.person),
-                    ),
-                    items: [
-                      const DropdownMenuItem(
-                        value: -1,
-                        child: Text("Multiple people"),
+                if (!widget.isPersonal) ...[
+                  if (!_isMultiplePayers)
+                    DropdownButtonFormField<int>(
+                      initialValue: _selectedPayerId,
+                      decoration: const InputDecoration(
+                        labelText: 'Paid By',
+                        prefixIcon: Icon(Icons.person),
                       ),
-                      ...members.map((m) {
-                        var text = m.name;
-                        if (m.userId ==
-                            ref.read(authRepositoryProvider).currentUser?.id) {
-                          text = "Me";
-                        }
-                        return DropdownMenuItem(value: m.id, child: Text(text));
-                      }),
-                    ],
-                    onChanged: (val) {
-                      if (val == -1) {
-                        setState(() {
-                          _isMultiplePayers = true;
-                          // Initialize selected payers (default to none or handle in dialog)
-                          // If current user is present, maybe select them?
-                          final currentUser = ref
-                              .read(authRepositoryProvider)
-                              .currentUser;
-                          final myMember = members
-                              .where((m) => m.userId == currentUser?.id)
-                              .firstOrNull;
-                          if (myMember != null) {
-                            _selectedPayerIds.add(myMember.id);
-                          }
-
-                          // Initialize controllers for ALL members just in case, but only show selected
-                          // Initialize controllers for ALL members just in case, but only show selected
-                          for (var m in members) {
-                            _getOrCreatePayerController(m.id);
-                          }
-
-                          // Auto open dialog
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            _showPayerSelectionDialog(members);
-                          });
-                        });
-                      } else {
-                        setState(() => _selectedPayerId = val);
-                      }
-                    },
-                  ),
-
-                if (_isMultiplePayers) ...[
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Paid by multiple people'),
-                    subtitle: Text(
-                      _selectedPayerIds.length == members.length
-                          ? 'All (${members.length})'
-                          : '${_selectedPayerIds.length} people selected',
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _isMultiplePayers = false;
-                              _selectedPayerId = members.first.id;
-                              _selectedPayerIds.clear();
-                            });
-                          },
-                          child: const Text("Reset"),
+                      items: [
+                        const DropdownMenuItem(
+                          value: -1,
+                          child: Text("Multiple people"),
                         ),
-                        const Icon(Icons.arrow_forward_ios, size: 16),
+                        ...members.map((m) {
+                          var text = m.name;
+                          if (m.userId ==
+                              ref
+                                  .read(authRepositoryProvider)
+                                  .currentUser
+                                  ?.id) {
+                            text = "Me";
+                          }
+                          return DropdownMenuItem(
+                            value: m.id,
+                            child: Text(text),
+                          );
+                        }),
                       ],
-                    ),
-                    onTap: () => _showPayerSelectionDialog(members),
-                  ),
+                      onChanged: (val) {
+                        if (val == -1) {
+                          setState(() {
+                            _isMultiplePayers = true;
+                            // Initialize selected payers (default to none or handle in dialog)
+                            // If current user is present, maybe select them?
+                            final currentUser = ref
+                                .read(authRepositoryProvider)
+                                .currentUser;
+                            final myMember = members
+                                .where((m) => m.userId == currentUser?.id)
+                                .firstOrNull;
+                            if (myMember != null) {
+                              _selectedPayerIds.add(myMember.id);
+                            }
 
-                  ...members.where((m) => _selectedPayerIds.contains(m.id)).map((
-                    m,
-                  ) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
+                            // Initialize controllers for ALL members just in case, but only show selected
+                            // Initialize controllers for ALL members just in case, but only show selected
+                            for (var m in members) {
+                              _getOrCreatePayerController(m.id);
+                            }
+
+                            // Auto open dialog
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              _showPayerSelectionDialog(members);
+                            });
+                          });
+                        } else {
+                          setState(() => _selectedPayerId = val);
+                        }
+                      },
+                    ),
+
+                  if (_isMultiplePayers) ...[
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Paid by multiple people'),
+                      subtitle: Text(
+                        _selectedPayerIds.length == members.length
+                            ? 'All (${members.length})'
+                            : '${_selectedPayerIds.length} people selected',
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          UserAvatar(
-                            avatarUrl: m.avatarUrl,
-                            name: m.name,
-                            radius: 16,
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _isMultiplePayers = false;
+                                _selectedPayerId = members.first.id;
+                                _selectedPayerIds.clear();
+                              });
+                            },
+                            child: const Text("Reset"),
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(child: Text(m.name)),
-                          SizedBox(
-                            width: 100,
-                            child: TextField(
-                              controller: _getOrCreatePayerController(m.id),
-                              decoration: InputDecoration(
-                                prefixText:
-                                    '${CurrencyUtils.getSymbol(widget.groupCurrency)} ',
-                                isDense: true,
-                                contentPadding: const EdgeInsets.all(8),
-                                border: const OutlineInputBorder(),
-                              ),
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
-                            ),
-                          ),
+                          const Icon(Icons.arrow_forward_ios, size: 16),
                         ],
                       ),
-                    );
-                  }),
+                      onTap: () => _showPayerSelectionDialog(members),
+                    ),
+
+                    ...members.where((m) => _selectedPayerIds.contains(m.id)).map((
+                      m,
+                    ) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            UserAvatar(
+                              avatarUrl: m.avatarUrl,
+                              name: m.name,
+                              radius: 16,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(m.name)),
+                            SizedBox(
+                              width: 100,
+                              child: TextField(
+                                controller: _getOrCreatePayerController(m.id),
+                                decoration: InputDecoration(
+                                  prefixText:
+                                      '${CurrencyUtils.getSymbol(widget.groupCurrency)} ',
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.all(8),
+                                  border: const OutlineInputBorder(),
+                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 16),
+                  ],
                   const SizedBox(height: 16),
                 ],
-                const SizedBox(height: 16),
 
                 // Category
-                DropdownButtonFormField<String>(
-                  initialValue: _selectedCategory,
-                  decoration: const InputDecoration(
-                    labelText: 'Category',
-                    prefixIcon: Icon(Icons.category),
-                  ),
-                  items:
-                      [
-                        'General',
-                        'Food & Drinks',
-                        'Housing',
-                        'Transport',
-                        'Utilities',
-                        'Entertainment',
-                      ].map((c) {
-                        return DropdownMenuItem(value: c, child: Text(c));
+                categoriesAsync.when(
+                  data: (categories) {
+                    if (_categories.isEmpty && categories.isNotEmpty) {
+                      _categories = categories;
+                      if (_selectedCategory == null ||
+                          !_categories.any(
+                            (c) => c.name == _selectedCategory,
+                          )) {
+                        _selectedCategory =
+                            'General'; // Default fallback? Or first category?
+                        if (categories.any((c) => c.name == 'General')) {
+                          _selectedCategory = 'General';
+                        } else if (categories.isNotEmpty) {
+                          _selectedCategory = categories.first.name;
+                        }
+                      }
+                    } else if (categories.isEmpty) {
+                      // Fallback if no categories found (shouldn't happen if seeded)
+                      return const SizedBox();
+                    }
+
+                    return DropdownButtonFormField<String>(
+                      key: ValueKey(_selectedCategory),
+                      initialValue: _selectedCategory,
+                      decoration: const InputDecoration(
+                        labelText: 'Category',
+                        prefixIcon: Icon(Icons.category),
+                      ),
+                      items: categories.map((c) {
+                        return DropdownMenuItem(
+                          value: c.name,
+                          child: Row(
+                            children: [
+                              if (c.icon != null) ...[
+                                Text(c.icon!),
+                                SizedBox(width: 8),
+                              ],
+                              Text(c.name),
+                            ],
+                          ),
+                        );
                       }).toList(),
-                  onChanged: (val) {
-                    setState(() => _selectedCategory = val ?? 'General');
+                      onChanged: (val) {
+                        setState(() => _selectedCategory = val);
+                      },
+                    );
                   },
+                  loading: () => const LinearProgressIndicator(),
+                  error: (e, s) => Text('Error loading categories: $e'),
                 ),
                 const SizedBox(height: 24),
 
-                // Split With Selection
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Split with'),
-                  subtitle: Text(
-                    _selectedMemberIds.length == members.length
-                        ? 'All (${members.length})'
-                        : '${_selectedMemberIds.length} people selected',
+                if (!widget.isPersonal) ...[
+                  // Split With Selection
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Split with'),
+                    subtitle: Text(
+                      _selectedMemberIds.length == members.length
+                          ? 'All (${members.length})'
+                          : '${_selectedMemberIds.length} people selected',
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () => _showMemberSelectionDialog(members),
                   ),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () => _showMemberSelectionDialog(members),
-                ),
-                const Divider(),
-                const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 16),
 
-                // Split Method Toggle
-                SegmentedButton<SplitMethod>(
-                  segments: const [
-                    ButtonSegment(
-                      value: SplitMethod.equal,
-                      label: Text('Equal'),
-                    ),
-                    ButtonSegment(
-                      value: SplitMethod.exact,
-                      label: Text('Exact'),
-                    ),
-                  ],
-                  selected: {_splitMethod},
-                  onSelectionChanged: (newSelection) {
-                    setState(() {
-                      _splitMethod = newSelection.first;
-                      if (_splitMethod == SplitMethod.exact) {
-                        _recalculateExactSplits(members);
-                      }
-                    });
-                  },
-                ),
-                const SizedBox(height: 16),
+                  // Split Method Toggle
+                  SegmentedButton<SplitMethod>(
+                    segments: const [
+                      ButtonSegment(
+                        value: SplitMethod.equal,
+                        label: Text('Equal'),
+                      ),
+                      ButtonSegment(
+                        value: SplitMethod.exact,
+                        label: Text('Exact'),
+                      ),
+                    ],
+                    selected: {_splitMethod},
+                    onSelectionChanged: (newSelection) {
+                      setState(() {
+                        _splitMethod = newSelection.first;
+                        if (_splitMethod == SplitMethod.exact) {
+                          _recalculateExactSplits(members);
+                        }
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
 
-                // Split Details
-                Text(
-                  'Split Details',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                if (_splitMethod == SplitMethod.equal)
-                  _buildEqualSplitView(members)
-                else
-                  _buildExactSplitView(members),
+                  // Split Details
+                  Text(
+                    'Split Details',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  if (_splitMethod == SplitMethod.equal)
+                    _buildEqualSplitView(members)
+                  else
+                    _buildExactSplitView(members),
+                ],
 
                 const SizedBox(height: 32),
                 FilledButton.icon(
@@ -958,7 +1003,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               description: desc,
               amount: totalAmount,
               payerId: finalPayerId!,
-              category: _selectedCategory,
+              category: _selectedCategory ?? 'General',
               date: DateTime.now(),
               splits: splits,
               payments: payments,
@@ -979,7 +1024,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 description: desc,
                 amount: totalAmount,
                 payerId: finalPayerId!,
-                category: _selectedCategory,
+                category: _selectedCategory ?? 'General',
                 date: widget.expense!.date,
                 splits: splits,
                 payments: payments,
