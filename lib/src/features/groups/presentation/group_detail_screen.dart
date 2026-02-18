@@ -39,7 +39,11 @@ class GroupDetailScreen extends ConsumerWidget {
       if (!isPersonal)
         BalancesScreen(groupId: group.id, groupCurrency: group.currency),
       if (!isPersonal) MembersListView(groupId: group.id),
-      GroupStatsScreen(groupId: group.id, groupCurrency: group.currency),
+      GroupStatsScreen(
+        groupId: group.id,
+        groupCurrency: group.currency,
+        isPersonal: isPersonal,
+      ),
       GroupSettingsScreen(group: group),
     ];
 

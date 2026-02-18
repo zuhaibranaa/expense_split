@@ -104,12 +104,12 @@ class MainScreen extends ConsumerWidget {
                       },
                     ),
 
-                    // 5. Profile
+                    // 5. Profile -> Now Wallet-styled
                     _buildCard(
                       context,
                       title: 'Profile',
                       icon: Icons.person_outline,
-                      color: Colors.grey,
+                      color: Colors.teal, // Updated to Teal (Wallet style)
                       onTap: () {
                         Navigator.push(
                           context,

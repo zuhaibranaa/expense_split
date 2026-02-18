@@ -10,6 +10,8 @@ import '../../../shared/utils/currency_utils.dart';
 import 'package:equisplit/src/shared/presentation/widgets/user_avatar.dart';
 import '../../categories/data/categories_repository.dart';
 import '../../categories/domain/category_model.dart';
+import '../../cash_inflows/data/cash_inflow_repository.dart';
+import '../../cash_inflows/domain/cash_inflow_model.dart';
 
 enum SplitMethod { equal, exact }
 
@@ -25,8 +27,13 @@ class AddExpenseScreen extends ConsumerStatefulWidget {
     required this.groupId,
     required this.groupCurrency,
     this.isPersonal = false,
+    this.isIncome = false,
     this.expense,
+    this.inflow,
   });
+
+  final bool isIncome;
+  final CashInflow? inflow;
 
   @override
   ConsumerState<AddExpenseScreen> createState() => _AddExpenseScreenState();
@@ -82,6 +89,12 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
       // Init Listeners
       _initPaymentListeners();
+      _initPaymentListeners();
+    } else if (_isInit && widget.inflow != null) {
+      _descriptionController.text = widget.inflow!.description;
+      _amountController.text = widget.inflow!.amount.toString();
+      _selectedCategory = widget.inflow!.category;
+      // Inflow typically has no payers/splits in this UI context
     }
     if (_isInit) {
       _loadAd();
@@ -112,7 +125,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     final categoriesAsync = ref.watch(groupCategoriesProvider(widget.groupId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('New Expense')),
+      appBar: AppBar(
+        title: Text(widget.isIncome ? 'New Income' : 'New Expense'),
+      ),
       body: membersAsync.when(
         data: (members) {
           if (members.isEmpty) {
@@ -216,8 +231,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Payer
-                if (!widget.isPersonal) ...[
+                // Payer (Hide if Income)
+                if (!widget.isIncome && !widget.isPersonal) ...[
                   if (!_isMultiplePayers)
                     DropdownButtonFormField<int>(
                       initialValue: _selectedPayerId,
@@ -399,7 +414,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                if (!widget.isPersonal) ...[
+                const SizedBox(height: 24),
+
+                if (!widget.isIncome && !widget.isPersonal) ...[
                   // Split With Selection
                   ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -467,9 +484,13 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                   label: Text(
                     _isLoading
                         ? 'Saving...'
-                        : (widget.expense == null
-                              ? 'Save Expense'
-                              : 'Update Expense'),
+                        : (widget.expense == null && widget.inflow == null
+                              ? (widget.isIncome
+                                    ? 'Save Income'
+                                    : 'Save Expense')
+                              : (widget.inflow != null
+                                    ? 'Update Income'
+                                    : 'Update Expense')),
                   ),
                 ),
               ],
@@ -898,6 +919,49 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       return;
     }
 
+    // Income Logic
+    if (widget.isIncome) {
+      setState(() => _isLoading = true);
+      try {
+        final user = ref.read(authRepositoryProvider).currentUser;
+        final currency = user?.defaultCurrency ?? widget.groupCurrency;
+
+        await ref
+            .read(cashInflowRepositoryProvider)
+            .createInflow(
+              amount: totalAmount,
+              currencyCode: currency,
+              description: desc,
+              category: _selectedCategory ?? 'Income',
+              date: DateTime.now(),
+            );
+
+        // Refresh User to update balance
+        await ref.read(authControllerProvider.notifier).reloadUser();
+
+        // Show Ad or Pop
+        if (!mounted) return;
+        final navigator = Navigator.of(context);
+        if (_interstitialAd != null) {
+          _interstitialAd!.show();
+        } else {
+          if (navigator.mounted) navigator.pop();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
+      return;
+    }
+
+    // Expense Logic
     if (!_isMultiplePayers && _selectedPayerId == null) {
       ScaffoldMessenger.of(
         context,
@@ -957,9 +1021,6 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       }
 
       payments = tempPayments;
-      // For backward compatibility, set payerId to the person who paid the most or first
-      // It's required by the API locally, though backend might ignore it if payments are present?
-      // Let's set it to the first payer for safety.
       finalPayerId = tempPayments.keys.first;
     }
 
@@ -980,7 +1041,6 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         sumCheck += val;
       }
 
-      // Allow a small epsilon for floating point math, but warn if totally off
       if ((sumCheck - totalAmount).abs() > 0.05) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -996,41 +1056,77 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     final navigator = Navigator.of(context);
     setState(() => _isLoading = true);
     try {
-      if (widget.expense == null) {
-        await ref
-            .read(expensesFutureProvider(widget.groupId).notifier)
-            .createExpense(
-              description: desc,
-              amount: totalAmount,
-              payerId: finalPayerId!,
-              category: _selectedCategory ?? 'General',
-              date: DateTime.now(),
-              splits: splits,
-              payments: payments,
-            );
-        if (_interstitialAd != null) {
-          _interstitialAd!.show();
+      if (widget.isIncome || widget.inflow != null) {
+        // --- INFLOW LOGIC ---
+        if (widget.inflow == null) {
+          // Create Inflow
+          await ref
+              .read(cashInflowRepositoryProvider)
+              .createInflow(
+                amount: totalAmount,
+                currencyCode: widget.groupCurrency,
+                category: _selectedCategory ?? 'Income',
+                description: desc,
+                date: DateTime.now(),
+              );
         } else {
-          if (navigator.mounted) navigator.pop();
+          // Update Inflow
+          await ref
+              .read(cashInflowRepositoryProvider)
+              .updateInflow(
+                id: widget.inflow!.id,
+                amount: totalAmount,
+                currencyCode: widget
+                    .groupCurrency, // Should we allow currency change? Keeping group currency for consistency
+                category: _selectedCategory ?? 'Income',
+                description: desc,
+                date: widget.inflow!.date,
+              );
         }
+        await ref.read(authControllerProvider.notifier).reloadUser();
+        if (navigator.mounted) navigator.pop();
       } else {
-        final user = ref.read(authControllerProvider).value;
-        if (user != null) {
+        // --- EXPENSE LOGIC ---
+        if (widget.expense == null) {
           await ref
               .read(expensesFutureProvider(widget.groupId).notifier)
-              .updateExpense(
-                expenseId: widget.expense!.id,
-                userId: user.id,
+              .createExpense(
                 description: desc,
                 amount: totalAmount,
                 payerId: finalPayerId!,
                 category: _selectedCategory ?? 'General',
-                date: widget.expense!.date,
+                date: DateTime.now(),
                 splits: splits,
                 payments: payments,
               );
+          // Refresh User to update balance
+          await ref.read(authControllerProvider.notifier).reloadUser();
+          if (_interstitialAd != null) {
+            _interstitialAd!.show();
+          } else {
+            if (navigator.mounted) navigator.pop();
+          }
+        } else {
+          final user = ref.read(authControllerProvider).value;
+          if (user != null) {
+            await ref
+                .read(expensesFutureProvider(widget.groupId).notifier)
+                .updateExpense(
+                  expenseId: widget.expense!.id,
+                  userId: user.id,
+                  description: desc,
+                  amount: totalAmount,
+                  payerId: finalPayerId!,
+                  category: _selectedCategory ?? 'General',
+                  date: widget.expense!.date,
+                  splits: splits,
+                  payments: payments,
+                );
+            // Refresh User to update balance
+            await ref.read(authControllerProvider.notifier).reloadUser();
+          }
+          if (navigator.mounted) navigator.pop();
         }
-        if (navigator.mounted) navigator.pop();
       }
     } catch (e) {
       if (mounted) {
