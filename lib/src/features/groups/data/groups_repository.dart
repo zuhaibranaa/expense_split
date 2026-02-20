@@ -71,6 +71,20 @@ class GroupsRepository {
     );
     return json.map((e) => Member.fromJson(e)).toList();
   }
+
+  Future<void> resetPersonalBalance() async {
+    await _api.post('/personal-group/reset-balance', {});
+  }
+
+  Future<void> syncPersonalFromExpenses({
+    required String startDate,
+    required String endDate,
+  }) async {
+    await _api.post('/personal-group/sync', {
+      'start_date': startDate,
+      'end_date': endDate,
+    });
+  }
 }
 
 // Re-using the same provider name, but changing type to FutureProvider for simplicity with HTTP,

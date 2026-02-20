@@ -40,6 +40,17 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
 
   bool _isFabExpanded = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Fetch fresh balance from server whenever the personal expenses tab is opened.
+    if (isPersonal) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(authControllerProvider.notifier).reloadUser();
+      });
+    }
+  }
+
   void _toggleFab() {
     setState(() {
       _isFabExpanded = !_isFabExpanded;
