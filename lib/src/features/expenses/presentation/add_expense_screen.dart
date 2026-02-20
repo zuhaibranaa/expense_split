@@ -919,156 +919,133 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       return;
     }
 
-    // Income Logic
-    if (widget.isIncome) {
-      setState(() => _isLoading = true);
-      try {
-        final user = ref.read(authRepositoryProvider).currentUser;
-        final currency = user?.defaultCurrency ?? widget.groupCurrency;
+    final bool isIncomeMode = widget.isIncome || widget.inflow != null;
 
-        await ref
-            .read(cashInflowRepositoryProvider)
-            .createInflow(
-              amount: totalAmount,
-              currencyCode: currency,
-              description: desc,
-              category: _selectedCategory ?? 'Income',
-              date: DateTime.now(),
-            );
-
-        // Refresh User to update balance
-        await ref.read(authControllerProvider.notifier).reloadUser();
-
-        // Show Ad or Pop
-        if (!mounted) return;
-        final navigator = Navigator.of(context);
-        if (_interstitialAd != null) {
-          _interstitialAd!.show();
-        } else {
-          if (navigator.mounted) navigator.pop();
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error: $e')));
-        }
-      } finally {
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
+    // Expense-only validation (skip for income)
+    if (!isIncomeMode) {
+      if (!_isMultiplePayers && _selectedPayerId == null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Please select a payer')));
+        return;
       }
-      return;
+
+      // Filter to ensure only valid, currently existing members are included
+      final activeMembers = members
+          .where((m) => _selectedMemberIds.contains(m.id))
+          .toList();
+
+      if (activeMembers.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select at least one person to split with'),
+          ),
+        );
+        return;
+      }
     }
 
-    // Expense Logic
-    if (!_isMultiplePayers && _selectedPayerId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please select a payer')));
-      return;
-    }
-
-    // Filter to ensure only valid, currently existing members are included
-    final activeMembers = members
-        .where((m) => _selectedMemberIds.contains(m.id))
-        .toList();
-
-    if (activeMembers.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select at least one person to split with'),
-        ),
-      );
-      return;
-    }
-
-    // Calculate Payments
+    // Calculate Payments & Splits (expense only)
     Map<int, double>? payments;
     int? finalPayerId = _selectedPayerId;
-
-    if (_isMultiplePayers) {
-      double paymentsSum = 0.0;
-      final Map<int, double> tempPayments = {};
-
-      for (var m in members) {
-        if (!_selectedPayerIds.contains(m.id)) continue;
-
-        final val =
-            double.tryParse(_payerControllers[m.id]?.text ?? '0') ?? 0.0;
-        if (val > 0) {
-          tempPayments[m.id] = val;
-          paymentsSum += val;
-        }
-      }
-
-      if ((paymentsSum - totalAmount).abs() > 0.05) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Payments sum (${CurrencyUtils.getSymbol(widget.groupCurrency)} $paymentsSum) must equal Total (${CurrencyUtils.getSymbol(widget.groupCurrency)} $totalAmount)',
-            ),
-          ),
-        );
-        return;
-      }
-
-      if (tempPayments.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter at least one payment')),
-        );
-        return;
-      }
-
-      payments = tempPayments;
-      finalPayerId = tempPayments.keys.first;
-    }
-
-    // Calculate Splits
     final Map<int, double> splits = {};
-    if (_splitMethod == SplitMethod.equal) {
-      final splitAmount = totalAmount / activeMembers.length;
-      for (var m in activeMembers) {
-        splits[m.id] = splitAmount;
-      }
-    } else {
-      // Exact split logic
-      double sumCheck = 0.0;
-      for (var m in activeMembers) {
-        final val =
-            double.tryParse(_splitControllers[m.id]?.text ?? '0') ?? 0.0;
-        splits[m.id] = val;
-        sumCheck += val;
+
+    if (!isIncomeMode) {
+      final activeMembers = members
+          .where((m) => _selectedMemberIds.contains(m.id))
+          .toList();
+
+      if (_isMultiplePayers) {
+        double paymentsSum = 0.0;
+        final Map<int, double> tempPayments = {};
+
+        for (var m in members) {
+          if (!_selectedPayerIds.contains(m.id)) continue;
+
+          final val =
+              double.tryParse(_payerControllers[m.id]?.text ?? '0') ?? 0.0;
+          if (val > 0) {
+            tempPayments[m.id] = val;
+            paymentsSum += val;
+          }
+        }
+
+        if ((paymentsSum - totalAmount).abs() > 0.05) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Payments sum (${CurrencyUtils.getSymbol(widget.groupCurrency)} $paymentsSum) must equal Total (${CurrencyUtils.getSymbol(widget.groupCurrency)} $totalAmount)',
+              ),
+            ),
+          );
+          return;
+        }
+
+        if (tempPayments.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please enter at least one payment')),
+          );
+          return;
+        }
+
+        payments = tempPayments;
+        finalPayerId = tempPayments.keys.first;
       }
 
-      if ((sumCheck - totalAmount).abs() > 0.05) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Splits sum (${CurrencyUtils.getSymbol(widget.groupCurrency)} $sumCheck) must equal Total (${CurrencyUtils.getSymbol(widget.groupCurrency)} $totalAmount)',
+      // Calculate Splits
+      if (_splitMethod == SplitMethod.equal) {
+        final splitAmount = totalAmount / activeMembers.length;
+        for (var m in activeMembers) {
+          splits[m.id] = splitAmount;
+        }
+      } else {
+        // Exact split logic
+        double sumCheck = 0.0;
+        for (var m in activeMembers) {
+          final val =
+              double.tryParse(_splitControllers[m.id]?.text ?? '0') ?? 0.0;
+          splits[m.id] = val;
+          sumCheck += val;
+        }
+
+        if ((sumCheck - totalAmount).abs() > 0.05) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Splits sum (${CurrencyUtils.getSymbol(widget.groupCurrency)} $sumCheck) must equal Total (${CurrencyUtils.getSymbol(widget.groupCurrency)} $totalAmount)',
+              ),
             ),
-          ),
-        );
-        return;
+          );
+          return;
+        }
       }
     }
 
     final navigator = Navigator.of(context);
     setState(() => _isLoading = true);
     try {
-      if (widget.isIncome || widget.inflow != null) {
+      if (isIncomeMode) {
         // --- INFLOW LOGIC ---
         if (widget.inflow == null) {
           // Create Inflow
+          final user = ref.read(authRepositoryProvider).currentUser;
+          final currency = user?.defaultCurrency ?? widget.groupCurrency;
           await ref
               .read(cashInflowRepositoryProvider)
               .createInflow(
                 amount: totalAmount,
-                currencyCode: widget.groupCurrency,
+                currencyCode: currency,
                 category: _selectedCategory ?? 'Income',
                 description: desc,
                 date: DateTime.now(),
               );
+          await ref.read(authControllerProvider.notifier).reloadUser();
+          if (!mounted) return;
+          if (_interstitialAd != null) {
+            _interstitialAd!.show();
+          } else {
+            if (navigator.mounted) navigator.pop();
+          }
         } else {
           // Update Inflow
           await ref
@@ -1076,15 +1053,14 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               .updateInflow(
                 id: widget.inflow!.id,
                 amount: totalAmount,
-                currencyCode: widget
-                    .groupCurrency, // Should we allow currency change? Keeping group currency for consistency
+                currencyCode: widget.inflow!.currencyCode,
                 category: _selectedCategory ?? 'Income',
                 description: desc,
                 date: widget.inflow!.date,
               );
+          await ref.read(authControllerProvider.notifier).reloadUser();
+          if (navigator.mounted) navigator.pop();
         }
-        await ref.read(authControllerProvider.notifier).reloadUser();
-        if (navigator.mounted) navigator.pop();
       } else {
         // --- EXPENSE LOGIC ---
         if (widget.expense == null) {

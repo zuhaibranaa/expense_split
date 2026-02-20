@@ -1007,7 +1007,11 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                             isPersonal: false,
                           ),
                         ),
-                      );
+                      ).then((_) {
+                        // ignore: unused_result
+                        ref.refresh(expensesFutureProvider(widget.groupId));
+                        ref.read(authControllerProvider.notifier).reloadUser();
+                      });
                     },
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1301,7 +1305,15 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                             isIncome: !isExpense,
                           ),
                         ),
-                      );
+                      ).then((_) {
+                        // ignore: unused_result
+                        ref.refresh(expensesFutureProvider(widget.groupId));
+                        if (isPersonal) {
+                          // ignore: unused_result
+                          ref.refresh(inflowsListProvider(widget.groupId));
+                        }
+                        ref.read(authControllerProvider.notifier).reloadUser();
+                      });
                     },
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
