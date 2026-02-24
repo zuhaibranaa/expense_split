@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/balance_calculator.dart';
-import '../data/expenses_repository.dart';
 import '../../groups/data/groups_repository.dart';
 import '../../people/domain/member_model.dart';
 import 'settle_up_screen.dart';
@@ -22,8 +21,7 @@ class BalancesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // USE unfiltered provider for balances so logic is always over ALL expenses
-    // Filters are applied LOCALLY to the result
-    final expensesAsync = ref.watch(expensesFutureProvider(groupId));
+    final expensesAsync = ref.watch(unfilteredExpensesFutureProvider(groupId));
     final membersAsync = ref.watch(allMembersFutureProvider(groupId));
     final minimize = ref.watch(minimizeDebtsProvider(groupId));
     final selectedUserId = ref.watch(expenseUserFilterProvider(groupId));
@@ -59,7 +57,7 @@ class BalancesScreen extends ConsumerWidget {
             return RefreshIndicator(
               onRefresh: () async {
                 final future1 = ref.refresh(
-                  expensesFutureProvider(groupId).future,
+                  unfilteredExpensesFutureProvider(groupId).future,
                 );
                 final future2 = ref.refresh(
                   allMembersFutureProvider(groupId).future,
@@ -83,7 +81,7 @@ class BalancesScreen extends ConsumerWidget {
                 onRefresh: () async {
                   // Refresh both dependencies
                   final future1 = ref.refresh(
-                    expensesFutureProvider(groupId).future,
+                    unfilteredExpensesFutureProvider(groupId).future,
                   );
                   final future2 = ref.refresh(
                     allMembersFutureProvider(groupId).future,
@@ -238,7 +236,9 @@ class BalancesScreen extends ConsumerWidget {
 
 final balancesProvider = Provider.family
     .autoDispose<AsyncValue<List<BalanceTransfer>>, int>((ref, groupId) {
-      final expensesAsync = ref.watch(expensesFutureProvider(groupId));
+      final expensesAsync = ref.watch(
+        unfilteredExpensesFutureProvider(groupId),
+      );
       final membersAsync = ref.watch(allMembersFutureProvider(groupId));
       final minimize = ref.watch(minimizeDebtsProvider(groupId));
 

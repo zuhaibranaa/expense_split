@@ -154,12 +154,12 @@ class _FilterActionButtonState extends State<_FilterActionButton> {
           backgroundColor: Colors.transparent,
           builder: (context) => FilterModal(
             groupId: widget.groupId,
-            showDateFilter: true, // Always show date
+            showDateFilter: !isBalances, // Balances always cover all time
             showSimplifyDebts: showSimplify,
             showMemberFilter:
                 !isStats &&
                 !widget.isPersonal, // Hide member filter on Stats AND Personal
-            useMonthPicker: isStats || isBalances,
+            useMonthPicker: isStats,
           ),
         );
       },
