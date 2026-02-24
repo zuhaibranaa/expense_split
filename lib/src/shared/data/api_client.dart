@@ -219,11 +219,19 @@ class ApiClient {
   }
 
   String _getFriendlyErrorMessage(int statusCode, String responseBody) {
+    // Never show raw server internals for 5xx — always use a generic message.
+    if (statusCode == 503) {
+      return 'Service unavailable. Please check your connection and try again.';
+    }
+    if (statusCode >= 500) {
+      return 'Something went wrong. Please try again later.';
+    }
+
     try {
       final json = jsonDecode(responseBody);
       if (json is Map<String, dynamic>) {
         if (json.containsKey('message')) {
-          // If 'errors' field exists (Laravel validation errors likely), append it
+          // If 'errors' field exists (Laravel validation errors), append each error
           if (json['errors'] != null && json['errors'] is Map) {
             final errors = json['errors'] as Map<String, dynamic>;
             final message = json['message'].toString();
@@ -251,7 +259,7 @@ class ApiClient {
         }
       }
     } catch (e) {
-      // Not JSON
+      // Not JSON or parse failed
     }
 
     if (statusCode == 401) return 'Invalid credentials. Please try again.';
@@ -259,8 +267,7 @@ class ApiClient {
       return 'You do not have permission to perform this action.';
     }
     if (statusCode == 404) return 'Resource not found.';
-    if (statusCode >= 500) return 'Server error. Please try again later.';
 
-    return 'Something went wrong ($statusCode)';
+    return 'Something went wrong. Please try again.';
   }
 }

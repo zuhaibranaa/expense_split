@@ -223,7 +223,7 @@ class AuthRepository {
       'email': _currentUser!.email,
       'name': name ?? _currentUser!.name,
       'avatar_url': avatarUrl ?? _currentUser!.avatarUrl,
-      'default_currency': currency ?? _currentUser!.defaultCurrency,
+      'currency': currency ?? _currentUser!.defaultCurrency,
       'phone': phone ?? _currentUser!.phone,
       'iban': iban ?? _currentUser!.iban,
       if (password != null) 'password': password,
