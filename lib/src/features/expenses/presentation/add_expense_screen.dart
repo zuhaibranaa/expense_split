@@ -1182,6 +1182,13 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   }
 
   void _loadAd() {
+    final user = ref.read(authControllerProvider).value;
+    final isPremium = user?.isPremium ?? false;
+
+    if (isPremium) {
+      return; // Premium users get an ad-free experience
+    }
+
     InterstitialAd.load(
       adUnitId: 'ca-app-pub-3940256099942544/1033173712', // Test ID
       request: const AdRequest(),

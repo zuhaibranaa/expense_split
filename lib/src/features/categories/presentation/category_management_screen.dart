@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import '../../categories/data/categories_repository.dart';
+import '../../auth/data/auth_repository.dart';
 
 class CategoryManagementScreen extends ConsumerStatefulWidget {
   final int groupId;
@@ -147,88 +148,151 @@ class _CategoryManagementScreenState
         children: [
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      GestureDetector(
-                        onTap: _showEmojiPicker,
-                        child: Stack(
-                          alignment: Alignment.bottomRight,
-                          children: [
-                            Container(
-                              width: 60,
-                              height: 60,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.surfaceContainerHighest,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.outline.withValues(alpha: 0.2),
-                                ),
-                              ),
-                              child: Text(
-                                _iconController.text.isEmpty
-                                    ? '?'
-                                    : _iconController.text,
-                                style: const TextStyle(fontSize: 32),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.primary,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Theme.of(context).colorScheme.surface,
-                                  width: 2,
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.edit,
-                                size: 12,
-                                color: Theme.of(context).colorScheme.onPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
+            child: Consumer(
+              builder: (context, ref, _) {
+                final user = ref.watch(authControllerProvider).value;
+                final isPremium = user?.isPremium ?? false;
+
+                if (!isPremium) {
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.outline.withValues(alpha: 0.2),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _nameController,
-                          decoration: const InputDecoration(
-                            labelText: 'New Category Name',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.label_outline),
+                    ),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.star, color: Colors.amber, size: 48),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Premium Feature',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
                           ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Please enter a name';
-                            }
-                            return null;
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Creating custom categories requires a premium subscription.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          onPressed: () {
+                            // TODO: Navigate to Upgrade Screen
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Upgrade screen coming soon!'),
+                              ),
+                            );
                           },
+                          icon: const Icon(Icons.workspace_premium),
+                          label: const Text('Upgrade to Premium'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          GestureDetector(
+                            onTap: _showEmojiPicker,
+                            child: Stack(
+                              alignment: Alignment.bottomRight,
+                              children: [
+                                Container(
+                                  width: 60,
+                                  height: 60,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.surfaceContainerHighest,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .outline
+                                          .withValues(alpha: 0.2),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _iconController.text.isEmpty
+                                        ? '?'
+                                        : _iconController.text,
+                                    style: const TextStyle(fontSize: 32),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.surface,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.edit,
+                                    size: 12,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onPrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _nameController,
+                              decoration: const InputDecoration(
+                                labelText: 'New Category Name',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.label_outline),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Please enter a name';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: _addCategory,
+                          child: const Text('Add Category'),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: _addCategory,
-                      child: const Text('Add Category'),
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
           ),
           const Divider(),

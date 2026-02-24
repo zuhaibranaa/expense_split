@@ -7,6 +7,8 @@ import '../../analytics/presentation/stats_screen.dart';
 import '../../analytics/presentation/global_settlements_screen.dart';
 import '../../groups/data/groups_repository.dart';
 
+import '../../auth/data/auth_repository.dart';
+
 class MainScreen extends ConsumerWidget {
   const MainScreen({super.key});
 
@@ -29,21 +31,54 @@ class MainScreen extends ConsumerWidget {
               children: [
                 // 1. Personal Expense Card (Full Width)
                 if (personalGroup != null)
-                  _buildCard(
-                    context,
-                    title: 'Personal Expenses',
-                    icon: Icons.person,
-                    color: Colors.blueAccent,
-                    onTap: () {
-                      Navigator.push(
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final user = ref.watch(authControllerProvider).value;
+                      final isPremium = user?.isPremium ?? false;
+
+                      return _buildCard(
                         context,
-                        MaterialPageRoute(
-                          builder: (ctx) =>
-                              GroupDetailScreen(group: personalGroup),
-                        ),
+                        title: 'Personal Expenses',
+                        icon: Icons.person,
+                        color: Colors.blueAccent,
+                        isLocked: !isPremium,
+                        onTap: () {
+                          if (!isPremium) {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('Premium Feature'),
+                                content: const Text(
+                                  'Accessing Personal Expenses requires a premium subscription. Please upgrade to unlock.',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  FilledButton(
+                                    onPressed: () {
+                                      Navigator.pop(ctx);
+                                      // TODO: Navigate to Upgrade Screen in the future
+                                    },
+                                    child: const Text('Upgrade'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            return;
+                          }
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (ctx) =>
+                                  GroupDetailScreen(group: personalGroup),
+                            ),
+                          );
+                        },
+                        isFullWidth: true,
                       );
                     },
-                    isFullWidth: true,
                   ),
                 if (personalGroup != null) const SizedBox(height: 16),
 
@@ -138,6 +173,7 @@ class MainScreen extends ConsumerWidget {
     required Color color,
     required VoidCallback onTap,
     bool isFullWidth = false,
+    bool isLocked = false,
   }) {
     return Card(
       elevation: 4,
@@ -157,19 +193,31 @@ class MainScreen extends ConsumerWidget {
               end: Alignment.bottomRight,
             ),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Stack(
             children: [
-              Icon(icon, size: 40, color: Colors.white),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, size: 40, color: Colors.white),
+                    const SizedBox(height: 12),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              if (isLocked)
+                const Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Icon(Icons.lock, color: Colors.white70, size: 24),
+                ),
             ],
           ),
         ),

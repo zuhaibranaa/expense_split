@@ -9,6 +9,7 @@ class User {
   final bool isVerified;
   final bool hasPassword;
   final double balance;
+  final bool isPremium;
 
   User({
     required this.id,
@@ -21,6 +22,7 @@ class User {
     this.isVerified = false,
     this.hasPassword = true,
     this.balance = 0.0,
+    this.isPremium = false,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -35,6 +37,8 @@ class User {
       isVerified: json['is_verified'] == 1 || json['is_verified'] == true,
       hasPassword: json['has_password'] ?? true,
       balance: (json['balance'] ?? 0).toDouble(),
+      isPremium:
+          json['is_active_premium'] == 1 || json['is_active_premium'] == true,
     );
   }
   Map<String, dynamic> toJson() {
@@ -49,6 +53,7 @@ class User {
       'is_verified': isVerified,
       'has_password': hasPassword,
       'balance': balance,
+      'is_active_premium': isPremium,
     };
   }
 }
