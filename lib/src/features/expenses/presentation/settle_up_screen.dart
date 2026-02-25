@@ -5,6 +5,7 @@ import '../../people/domain/member_model.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/utils/currency_utils.dart';
 import '../../auth/data/auth_repository.dart';
+import 'expenses_providers.dart';
 
 class SettleUpScreen extends ConsumerStatefulWidget {
   final int groupId;
@@ -89,6 +90,7 @@ class _SettleUpScreenState extends ConsumerState<SettleUpScreen> {
             isSettlement: true,
           );
 
+      ref.invalidate(unfilteredExpensesFutureProvider(widget.groupId));
       // Refresh User to update balance
       await ref.read(authControllerProvider.notifier).reloadUser();
 

@@ -63,8 +63,17 @@ dependencies:
   emoji_picker_flutter: ^4.4.0
 
 dev_dependencies:
+  flutter_launcher_icons: ^0.13.1
   flutter_test:
     sdk: flutter
+
+flutter_launcher_icons:
+  android: "launcher_icon" # can be true, false, or a custom icon name
+  ios: true # can be true, false, or a custom icon name
+  image_path: "assets/images/icon.png" # path to your image
+  # Optional: Add adaptive icon support for Android
+  # adaptive_icon_background: "#ffffff"
+  # adaptive_icon_foreground: "assets/images/foreground.png"
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

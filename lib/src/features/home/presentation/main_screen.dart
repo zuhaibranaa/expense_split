@@ -59,7 +59,15 @@ class MainScreen extends ConsumerWidget {
                                   FilledButton(
                                     onPressed: () {
                                       Navigator.pop(ctx);
-                                      // TODO: Navigate to Upgrade Screen in the future
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Upgrade screen coming soon!',
+                                          ),
+                                        ),
+                                      );
                                     },
                                     child: const Text('Upgrade'),
                                   ),

@@ -7,6 +7,7 @@ import '../../people/domain/member_model.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../groups/data/groups_repository.dart';
 import 'package:equisplit/src/shared/presentation/widgets/user_avatar.dart';
+import 'expenses_providers.dart';
 
 class PaymentsListScreen extends ConsumerWidget {
   final int groupId;
@@ -366,6 +367,12 @@ class PaymentsListScreen extends ConsumerWidget {
                             .read(expensesFutureProvider(groupId).notifier)
                             .deleteExpense(payment.id, user.id);
                         if (context.mounted) {
+                          ref.invalidate(
+                            unfilteredExpensesFutureProvider(groupId),
+                          );
+                          ref
+                              .read(authControllerProvider.notifier)
+                              .reloadUser();
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Payment deleted')),
                           );

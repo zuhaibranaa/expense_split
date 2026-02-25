@@ -187,7 +187,6 @@ class _CategoryManagementScreenState
                         const SizedBox(height: 16),
                         FilledButton.icon(
                           onPressed: () {
-                            // TODO: Navigate to Upgrade Screen
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Upgrade screen coming soon!'),

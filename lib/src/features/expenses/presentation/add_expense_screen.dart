@@ -12,6 +12,7 @@ import '../../categories/data/categories_repository.dart';
 import '../../categories/domain/category_model.dart';
 import '../../cash_inflows/data/cash_inflow_repository.dart';
 import '../../cash_inflows/domain/cash_inflow_model.dart';
+import 'expenses_providers.dart';
 
 enum SplitMethod { equal, exact }
 
@@ -1039,6 +1040,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 description: desc,
                 date: DateTime.now(),
               );
+          ref.invalidate(inflowsListProvider(widget.groupId));
           await ref.read(authControllerProvider.notifier).reloadUser();
           if (!mounted) return;
           if (_interstitialAd != null) {
@@ -1058,6 +1060,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 description: desc,
                 date: widget.inflow!.date,
               );
+          ref.invalidate(inflowsListProvider(widget.groupId));
           await ref.read(authControllerProvider.notifier).reloadUser();
           if (navigator.mounted) navigator.pop();
         }
@@ -1075,6 +1078,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 splits: splits,
                 payments: payments,
               );
+          ref.invalidate(unfilteredExpensesFutureProvider(widget.groupId));
           // Refresh User to update balance
           await ref.read(authControllerProvider.notifier).reloadUser();
           if (_interstitialAd != null) {
@@ -1098,6 +1102,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                   splits: splits,
                   payments: payments,
                 );
+            ref.invalidate(unfilteredExpensesFutureProvider(widget.groupId));
             // Refresh User to update balance
             await ref.read(authControllerProvider.notifier).reloadUser();
           }
