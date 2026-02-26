@@ -71,6 +71,9 @@ flutter_launcher_icons:
   android: "launcher_icon" # can be true, false, or a custom icon name
   ios: true # can be true, false, or a custom icon name
   image_path: "assets/images/icon.png" # path to your image
+  web:
+    generate: true
+    image_path: "assets/images/icon.png"
   # Optional: Add adaptive icon support for Android
   # adaptive_icon_background: "#ffffff"
   # adaptive_icon_foreground: "assets/images/foreground.png"
