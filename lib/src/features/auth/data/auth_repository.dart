@@ -129,12 +129,9 @@ class AuthRepository {
 
   Future<void> handleGoogleAuth(GoogleSignInAccount googleUser) async {
     try {
-      // Analyzer suggests authentication is not a Future here, so we access it directly.
-      // If this causes a runtime error, it should be reverted to 'await'.
-      final dynamic auth = googleUser.authentication;
-      final GoogleSignInAuthentication googleAuth = auth is Future
-          ? await auth
-          : auth;
+      // In google_sign_in v7.x, authentication always returns a Future<GoogleSignInAuthentication>
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
       final idToken = googleAuth.idToken;
 
       if (idToken == null) {

@@ -64,7 +64,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '931195916704',
     projectId: 'equisplit-d4c74',
     storageBucket: 'equisplit-d4c74.firebasestorage.app',
-    iosBundleId: 'com.equispli.click',
+    iosBundleId: 'com.equisplit.click',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -73,7 +73,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '931195916704',
     projectId: 'equisplit-d4c74',
     storageBucket: 'equisplit-d4c74.firebasestorage.app',
-    iosBundleId: 'com.example.settleUpClone',
+    iosBundleId: 'com.equisplit.click',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

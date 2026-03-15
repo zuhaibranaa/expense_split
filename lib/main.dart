@@ -17,9 +17,15 @@ void main() async {
     MobileAds.instance.initialize();
   }
 
-  // Initialize Google Sign In (Web uses meta tag for clientId)
-  // We await it to ensure it's ready before usage (especially for renderButton on Web)
-  await GoogleSignIn.instance.initialize();
+  // Initialize Google Sign In.
+  // serverClientId (Web OAuth Client ID) is required on Android so that authenticate()
+  // returns an idToken which can be verified by the backend.
+  // On Web, the clientId is set via the meta tag in index.html.
+  await GoogleSignIn.instance.initialize(
+    serverClientId: kIsWeb
+        ? null
+        : '931195916704-j59hlrmtla5tdfk2ktis923u0b0d4h12.apps.googleusercontent.com',
+  );
 
   final container = ProviderContainer();
   // Don't await init completely if it blocks, but init() in NotificationService calls _initFirebaseMessaging

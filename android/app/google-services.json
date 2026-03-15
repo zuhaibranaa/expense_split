@@ -7,12 +7,25 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:931195916704:android:1ab646ba4b96d35e6294c5",
+        "mobilesdk_app_id": "1:931195916704:android:1010e98f45a1db876294c5",
         "android_client_info": {
-          "package_name": "com.equisplit.app"
+          "package_name": "apk.equisplit.click"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "931195916704-rg7s8dea1v39d6ubunck06b40ek88q3m.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "apk.equisplit.click",
+            "certificate_hash": "df8f660532503c024237841e939079a7a0043f33"
+          }
+        },
+        {
+          "client_id": "931195916704-j59hlrmtla5tdfk2ktis923u0b0d4h12.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCmJsMIidhPB2DrBU9b0B-f5GKKISPctsU"
@@ -20,7 +33,63 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "931195916704-j59hlrmtla5tdfk2ktis923u0b0d4h12.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "931195916704-5v37msecrgapvrclffmqh61v8f0a4mbn.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.equispli.click"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:931195916704:android:1ab646ba4b96d35e6294c5",
+        "android_client_info": {
+          "package_name": "com.equisplit.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "931195916704-r82j0j5nt91fu5bi7k60d0aa5v8dep5j.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.equisplit.app",
+            "certificate_hash": "df8f660532503c024237841e939079a7a0043f33"
+          }
+        },
+        {
+          "client_id": "931195916704-j59hlrmtla5tdfk2ktis923u0b0d4h12.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCmJsMIidhPB2DrBU9b0B-f5GKKISPctsU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "931195916704-j59hlrmtla5tdfk2ktis923u0b0d4h12.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "931195916704-5v37msecrgapvrclffmqh61v8f0a4mbn.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.equispli.click"
+              }
+            }
+          ]
         }
       }
     }

@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.equisplit.app">
+    package="apk.equisplit.click">
     <application
         android:label="Equisplit"
         android:name="${applicationName}"
