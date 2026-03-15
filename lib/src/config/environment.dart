@@ -3,15 +3,13 @@ import '../shared/utils/platform_info.dart';
 class Environment {
   static const String _prodApiBaseUrl =
       'https://stagging-api.equisplit.click/api/';
-  static const String _prodWsBaseUrl = 'ws://stagging-api.equisplit.click';
+  static const String _prodWsBaseUrl = 'wss://stagging-api.equisplit.click';
 
-  static const String _devApiBaseUrl = 'http://192.168.18.20:8000/api/';
-  static const String _devWsBaseUrl = 'ws://192.168.18.20:8000';
+  static const String _devApiBaseUrl = 'http://[IP_ADDRESS]:8000/api/';
+  static const String _devWsBaseUrl = 'ws://[IP_ADDRESS]';
 
-  static const String _androidDevApiBaseUrl =
-      'https://stagging-api.equisplit.click/api/';
-  static const String _androidDevWsBaseUrl =
-      'ws://stagging-api.equisplit.click';
+  static const String _androidDevApiBaseUrl = 'http://[IP_ADDRESS]:8000/api/';
+  static const String _androidDevWsBaseUrl = 'ws://[IP_ADDRESS]:8000';
 
   static bool get isProduction => const bool.fromEnvironment('dart.vm.product');
 

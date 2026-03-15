@@ -22,3 +22,11 @@
 # Google Play Core
 -dontwarn com.google.android.play.core.**
 -keep class com.google.android.play.core.** { *; }
+
+# Google Sign-In
+-keep class com.google.android.gms.auth.api.signin.** { *; }
+-dontwarn com.google.android.gms.auth.api.signin.**
+
+# Firebase
+-keep class com.google.firebase.** { *; }
+-dontwarn com.google.firebase.**

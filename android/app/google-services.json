@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "931195916704-9h2d546ofb2m4d650sse33r6qt4el6n3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "apk.equisplit.click",
+            "certificate_hash": "e21a42ebff41594ec001f5b1043d2ac7bb5a636c"
+          }
+        },
+        {
           "client_id": "931195916704-rg7s8dea1v39d6ubunck06b40ek88q3m.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
