@@ -4,7 +4,7 @@
       "android": {
         "default": {
           "projectId": "equisplit-d4c74",
-          "appId": "1:931195916704:android:1ab646ba4b96d35e6294c5",
+          "appId": "1:931195916704:android:1010e98f45a1db876294c5",
           "fileOutput": "android/app/google-services.json"
         }
       },
@@ -28,7 +28,7 @@
         "lib/firebase_options.dart": {
           "projectId": "equisplit-d4c74",
           "configurations": {
-            "android": "1:931195916704:android:1ab646ba4b96d35e6294c5",
+            "android": "1:931195916704:android:1010e98f45a1db876294c5",
             "ios": "1:931195916704:ios:40b8624d055af8666294c5",
             "macos": "1:931195916704:ios:a75e626bedfaa9fb6294c5",
             "web": "1:931195916704:web:576425aea48bb46a6294c5",
@@ -44,6 +44,45 @@
   },
   "storage": {
     "rules": "storage.rules"
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(js|css|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot|ico|json)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=3600"
+          }
+        ]
+      },
+      {
+        "source": "/firebase-messaging-sw.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/index.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      }
+    ]
   },
   "functions": [
     {

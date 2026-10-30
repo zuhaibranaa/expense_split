@@ -45,6 +45,25 @@ EquiSplit is **serverless**: the app talks directly to Firebase (Auth, Firestore
 
 Linux is intentionally unsupported: FlutterFire has no Linux implementation for this stack.
 
+## 🔧 Current status
+
+- **Firebase project**: `equisplit-d4c74` ✅ configured
+- **Firestore database**: `europe-west1` ✅ deployed (recreated from nam5)
+- **Hosting**: `https://equisplit-d4c74.web.app` ✅ deployed and live
+- **Cloud Functions**: ⏳ pending (requires Cloud Functions API enablement)
+- **Storage**: ✅ configured (bucket reference: `equisplit-d4c74.firebasestorage.app`)
+
+**Note**: The Cloud Functions API is currently disabled and requires console enablement. Rules, indexes, and hosting are deployed and live.
+
+## 🔍 Quick verification
+
+Check the live site:
+
+```bash
+curl -I https://equisplit-d4c74.web.app
+# Should return HTTP/2 200
+```
+
 ---
 
 ## 🏗️ Architecture
@@ -167,10 +186,28 @@ flutter run -d windows
 flutter run -d <android-or-ios-device>
 ```
 
-### 4. Deploy rules, indexes and functions
+### 4. Deploy rules, indexes and hosting
+
+**Already deployed in this session**:
 
 ```bash
+# Rules, indexes, and hosting are already deployed:
 firebase deploy --only firestore:rules,firestore:indexes,storage
+firebase deploy --only hosting
+```
+
+**Current status**:
+- ✅ Firestore rules and indexes deployed to `europe-west1`
+- ✅ Hosting live at `https://equisplit-d4c74.web.app`
+- ⏳ Cloud Functions pending (requires Cloud Functions API enablement)
+
+To enable Cloud Functions API:
+1. Go to [Firebase Console](https://console.firebase.google.com/project/equisplit-d4c74/functions)
+2. Enable the Cloud Functions API
+3. Set up Blaze billing if needed
+4. Then run:
+
+```bash
 npm --prefix functions run build
 firebase deploy --only functions
 ```
@@ -178,7 +215,6 @@ firebase deploy --only functions
 Functions deploy to `europe-west1` (see `functions/src/index.ts`). Set the invite link host if you use a custom domain:
 
 ```bash
-firebase functions:config:set  # legacy; for v2 params use functions/.env
 # functions/.env
 INVITE_BASE_URL=https://app.example.com
 ```
@@ -215,6 +251,8 @@ flutter build web --release
 firebase deploy --only hosting
 ```
 
+**Note**: The Flutter web build and Firebase Hosting deployment has already been completed in this session. The site is currently live at `https://equisplit-d4c74.web.app`.
+
 ---
 
 ## 🧪 Quality
@@ -227,7 +265,13 @@ npm --prefix functions run build   # type-check Cloud Functions
 npm --prefix functions run lint
 ```
 
-Rules and end-to-end tests run on the Firebase emulators (JDK 21+ required):
+**Currently deployed**:
+
+✅ **Rules & Indexes**: Deployed to production Firestore (`europe-west1`)
+✅ **Hosting**: Live at `https://equisplit-d4c74.web.app`
+⏳ **Cloud Functions**: Pending (requires Cloud Functions API enablement)
+
+**Emulator testing** (for development):
 
 ```bash
 # Firestore + Storage rules (36 tests, every deny path)
@@ -258,9 +302,13 @@ The golden-path test talks to the emulator REST APIs directly, so the real rules
 - Emulator can't reach emulators → `10.0.2.2` is handled automatically by `firebase_bootstrap.dart`; verify the emulator is started with `firebase emulators:start`
 - `google-services.json` missing → re-run `flutterfire configure --project=equisplit-d4c74`
 
-**Functions**
+**Functions (pending)**
 - `permission-denied` calling a function → send a CORS-enabled call from the app (callables do this) and check the user is signed in
 - `internal` errors → `firebase functions:log`
+
+**Current status**
+- Hosting is deployed and live: `https://equisplit-d4c74.web.app`
+- Cloud Functions API requires console enablement (not yet deployed)
 
 **General**
 - Build errors → `flutter clean && flutter pub get`

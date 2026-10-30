@@ -1,6 +1,6 @@
 # EquiSplit — Architecture Decisions
 
-**Status:** Implemented (Phases 0–3); parity QA pending
+**Status:** Implemented (Phases 0–3); deployed rules, indexes, hosting; parity QA pending
 **Date:** 2026-10-29 (updated 2026-10-30)
 **Applies to:** `expense_split/` (Flutter client) and the retirement of the companion `equisplit/` Laravel API.
 **Firebase project:** `equisplit-d4c74` (already configured in `firebase.json` and `lib/firebase_options.dart`).

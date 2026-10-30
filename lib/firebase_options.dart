@@ -52,7 +52,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCmJsMIidhPB2DrBU9b0B-f5GKKISPctsU',
-    appId: '1:931195916704:android:1ab646ba4b96d35e6294c5',
+    appId: '1:931195916704:android:1010e98f45a1db876294c5',
     messagingSenderId: '931195916704',
     projectId: 'equisplit-d4c74',
     storageBucket: 'equisplit-d4c74.firebasestorage.app',
