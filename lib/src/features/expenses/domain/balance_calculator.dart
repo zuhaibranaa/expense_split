@@ -25,7 +25,7 @@ class BalanceCalculator {
     // 1. Calculate net balance for each member
     // + means they paid more than their share (they are owed money)
     // - means they paid less than their share (they owe money)
-    final balances = <int, double>{};
+    final balances = <String, double>{};
 
     for (var member in members) {
       balances[member.id] = 0.0;
@@ -107,7 +107,7 @@ class BalanceCalculator {
     List<Member> members,
   ) {
     // Map: FromId -> ToId -> Amount
-    final debts = <int, Map<int, double>>{};
+    final debts = <String, Map<String, double>>{};
 
     // 1. Accumulate all debts
     for (var expense in expenses) {
@@ -193,15 +193,15 @@ class BalanceCalculator {
 }
 
 class DebtNode {
-  final int memberId;
+  final String memberId;
   double amount;
 
   DebtNode(this.memberId, this.amount);
 }
 
 class BalanceTransfer {
-  final int fromMemberId;
-  final int toMemberId;
+  final String fromMemberId;
+  final String toMemberId;
   final double amount;
 
   BalanceTransfer({

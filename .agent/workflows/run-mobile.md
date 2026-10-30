@@ -4,48 +4,24 @@ description: Run the app on mobile (Android/iOS)
 
 # Run on Mobile Platforms
 
-This workflow runs the SettleUp Clone app on Android or iOS devices/emulators.
+This workflow runs EquiSplit on Android or iOS devices/emulators against Firebase.
 
 ## Prerequisites
 
-### For Android:
-- Flutter SDK installed with Android support
-- Android Studio installed
-- Android emulator or physical device connected
+### Android
+- Flutter SDK with Android support
+- Android Studio + SDK
+- Emulator or physical device connected
+- `android/app/google-services.json` (already committed)
 
-### For iOS:
-- Flutter SDK installed with iOS support (macOS only)
-- Xcode installed
-- iOS simulator or physical device connected
-- CocoaPods installed
+### iOS
+- Flutter SDK with iOS support (macOS only)
+- Xcode + CocoaPods
+- Simulator or physical device connected
+- `ios/Runner/GoogleService-Info.plist` (already committed)
 
-## Backend Configuration
-
-**Important**: Mobile devices cannot access `localhost` on your development machine directly.
-
-### For Android Emulator:
-The app automatically uses `http://10.0.2.2:8000` which maps to your host machine's localhost.
-
-### For iOS Simulator:
-The app uses `http://localhost:8000` which works on iOS simulator.
-
-### For Physical Devices:
-You'll need to modify the backend URL to use your computer's IP address:
-
-1. Find your computer's IP address:
-   - macOS: System Preferences → Network
-   - Windows: `ipconfig`
-   - Linux: `ifconfig` or `ip addr`
-
-2. Temporarily modify `lib/src/shared/utils/platform_info.dart`:
-   ```dart
-   static String getDefaultApiBaseUrl() {
-     // Replace with your computer's IP address
-     return 'http://192.168.1.XXX:8000';
-   }
-   ```
-
-3. Ensure your backend server is accessible from the network (not just localhost)
+### Backend
+There is **no local API server**. Use the Firebase emulators or the real project.
 
 ## Steps
 
@@ -55,29 +31,47 @@ flutter devices
 ```
 
 2. **Get dependencies**:
-// turbo
 ```bash
 flutter pub get
 ```
 
-3. **Run on Android**:
+3. **Choose a backend**
+
+   **A. Emulators:**
 ```bash
-flutter run -d <android-device-id>
+firebase emulators:start
+```
+   Then run with the flag:
+```bash
+# Android emulator
+flutter run -d <android-device-id> --dart-define=USE_FIREBASE_EMULATORS=true
+
+# iOS simulator
+flutter run -d <ios-device-id> --dart-define=USE_FIREBASE_EMULATORS=true
 ```
 
-4. **Run on iOS** (macOS only):
+   `firebase_bootstrap.dart` automatically uses `10.0.2.2` on Android and `localhost` on iOS.
+
+   **B. Real Firebase project:**
 ```bash
-flutter run -d <ios-device-id>
+flutter run -d <android-or-ios-device-id>
 ```
+
+> Physical devices cannot reach `localhost` emulators. Either forward ports (`adb reverse`) or use the real project.
+
+## Push notifications
+
+- **Android** → `google-services.json` includes the sender ID; FCM registrations are written to `users/{uid}/devices/{fid}`.
+- **iOS** → upload your APNs auth key in Firebase Console → Cloud Messaging, and enable the Push Notifications capability in Xcode. Simulators do not receive APNs pushes.
 
 ## Troubleshooting
 
-### Android:
-- If the emulator doesn't start, launch it from Android Studio first
-- For API connectivity issues, verify the backend is running and accessible
-- Check `adb logcat` for detailed error logs
+### Android
+- Emulator not starting → launch it from Android Studio first.
+- `google-services.json` missing → `flutterfire configure --project=equisplit-d4c74`.
+- Check logs with `adb logcat`.
 
-### iOS:
-- If CocoaPods fails, run `pod install` in the `ios` directory
-- For signing issues, open `ios/Runner.xcworkspace` in Xcode and configure signing
-- Check Xcode console for detailed error logs
+### iOS
+- CocoaPods fails → `pod install` in `ios/`.
+- Signing issues → open `ios/Runner.xcworkspace` in Xcode and configure a team.
+- Google sign-in fails → confirm the `REVERSED_CLIENT_ID` URL scheme is in `Info.plist`.

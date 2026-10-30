@@ -9,7 +9,7 @@ import 'package:equisplit/src/shared/presentation/widgets/user_avatar.dart';
 import 'expenses_providers.dart';
 
 class BalancesScreen extends ConsumerWidget {
-  final int groupId;
+  final String groupId;
   final String groupCurrency; // Add group currency
 
   const BalancesScreen({
@@ -98,10 +98,10 @@ class BalancesScreen extends ConsumerWidget {
                         itemBuilder: (context, index) {
                           final transfer = transfers[index];
                           // Helper to get Member object
-                          Member getMember(int id) => members.firstWhere(
+                          Member getMember(String id) => members.firstWhere(
                             (m) => m.id == id,
                             orElse: () => Member(
-                              id: -1,
+                              id: '',
                               groupId: groupId,
                               name: 'Unknown',
                             ),
@@ -235,7 +235,7 @@ class BalancesScreen extends ConsumerWidget {
 }
 
 final balancesProvider = Provider.family
-    .autoDispose<AsyncValue<List<BalanceTransfer>>, int>((ref, groupId) {
+    .autoDispose<AsyncValue<List<BalanceTransfer>>, String>((ref, groupId) {
       final expensesAsync = ref.watch(
         unfilteredExpensesFutureProvider(groupId),
       );

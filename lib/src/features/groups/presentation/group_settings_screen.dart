@@ -32,18 +32,18 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
     return members.firstWhere(
       (m) => m.userId == user.id,
       orElse: () => Member(
-        id: -1,
+        id: '',
         groupId: widget.group.id,
         name: '',
         userId: null,
-        isAdmin: 0,
+        isAdmin: false,
       ),
     );
   }
 
   Future<bool> _isCurrentUserAdmin() async {
     final member = await _getCurrentUserMember();
-    return member?.isAdmin == 1;
+    return member?.isAdmin == true;
   }
 
   @override
@@ -130,19 +130,10 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
                             ),
                             const SizedBox(height: 8),
                             const Text(
-                              'Manage your personal balance and sync data from group expenses.',
+                              'Manage your personal balance.',
                               style: TextStyle(color: Colors.grey),
                             ),
                             const SizedBox(height: 16),
-                            OutlinedButton.icon(
-                              onPressed: () => _showSyncDialog(context),
-                              icon: const Icon(Icons.sync),
-                              label: const Text('Sync from Expenses'),
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size.fromHeight(44),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
                             OutlinedButton.icon(
                               onPressed: () => _showResetBalanceDialog(context),
                               icon: const Icon(
@@ -283,185 +274,9 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
       await ref.read(groupsRepositoryProvider).resetPersonalBalance();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Reset job dispatched — balance will be cleared shortly.',
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  // ─── Sync from Expenses ───────────────────────────────────────────────────
-
-  void _showSyncDialog(BuildContext context) {
-    final now = DateTime.now();
-    DateTime startMonth = DateTime(now.year, now.month, 1);
-    DateTime endMonth = DateTime(now.year, now.month, 1);
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (ctx, setDialogState) {
-            String formatMonth(DateTime dt) {
-              const months = [
-                'Jan',
-                'Feb',
-                'Mar',
-                'Apr',
-                'May',
-                'Jun',
-                'Jul',
-                'Aug',
-                'Sep',
-                'Oct',
-                'Nov',
-                'Dec',
-              ];
-              return '${months[dt.month - 1]} ${dt.year}';
-            }
-
-            Future<void> pickMonth({
-              required bool isStart,
-              required DateTime current,
-            }) async {
-              final picked = await showDatePicker(
-                context: ctx,
-                initialDate: current,
-                firstDate: DateTime(2020),
-                lastDate: now,
-                helpText: isStart ? 'Select start month' : 'Select end month',
-                initialDatePickerMode: DatePickerMode.year,
-              );
-              if (picked == null) return;
-              final month = DateTime(picked.year, picked.month, 1);
-              setDialogState(() {
-                if (isStart) {
-                  startMonth = month;
-                  if (endMonth.isBefore(startMonth)) endMonth = startMonth;
-                } else {
-                  endMonth = month;
-                  if (startMonth.isAfter(endMonth)) startMonth = endMonth;
-                }
-              });
-            }
-
-            return AlertDialog(
-              title: const Text('Sync from Expenses'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Select the month range to sync your personal data from group expenses and payments.',
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'From',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            OutlinedButton(
-                              onPressed: () =>
-                                  pickMonth(isStart: true, current: startMonth),
-                              child: Text(formatMonth(startMonth)),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'To',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            OutlinedButton(
-                              onPressed: () =>
-                                  pickMonth(isStart: false, current: endMonth),
-                              child: Text(formatMonth(endMonth)),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () async {
-                    Navigator.pop(dialogContext);
-                    final start =
-                        '${startMonth.year}-${startMonth.month.toString().padLeft(2, '0')}-01';
-                    // Last day of end month
-                    final lastDay = DateTime(
-                      endMonth.year,
-                      endMonth.month + 1,
-                      0,
-                    );
-                    final end =
-                        '${lastDay.year}-${lastDay.month.toString().padLeft(2, '0')}-${lastDay.day.toString().padLeft(2, '0')}';
-                    await _doSync(startDate: start, endDate: end);
-                  },
-                  child: const Text('Sync'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Future<void> _doSync({
-    required String startDate,
-    required String endDate,
-  }) async {
-    setState(() => _isLoading = true);
-    try {
-      await ref
-          .read(groupsRepositoryProvider)
-          .syncPersonalFromExpenses(startDate: startDate, endDate: endDate);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Sync job dispatched — data will be updated shortly.',
-            ),
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Balance reset.')));
       }
     } catch (e) {
       if (mounted) {

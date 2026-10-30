@@ -1,133 +1,190 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/firebase/firestore_refs.dart';
 import '../domain/member_model.dart';
-import '../../../shared/data/api_client.dart';
 
 class MembersRepository {
-  final ApiClient _api;
+  MembersRepository(this._refs, this._functions);
 
-  MembersRepository(this._api);
+  final FirestoreRefs _refs;
+  final FirebaseFunctions _functions;
 
-  Future<void> addMember(int groupId, String name) async {
-    await _api.post('/groups/$groupId/members/', {'name': name});
+  Future<void> addMember(String groupId, String name) async {
+    final cleanName = name.trim();
+    if (cleanName.isEmpty) {
+      throw ArgumentError('Member name cannot be empty.');
+    }
+    await _refs.members(groupId).add({
+      'name': cleanName,
+      'uid': null,
+      'isAdmin': false,
+      'isRemoved': false,
+      'hasFcmToken': false,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Stream<List<Member>> watchMembers(
+    String groupId, {
+    bool includeDeleted = false,
+  }) {
+    Query<Map<String, dynamic>> query = _refs.members(groupId);
+    if (!includeDeleted) {
+      query = query.where('isRemoved', isEqualTo: false);
+    }
+    return query.snapshots().map(
+      (snapshot) => snapshot.docs
+          .map((doc) => Member.fromDoc(groupId, doc))
+          .toList(growable: false),
+    );
   }
 
   Future<List<Member>> getMembers(
-    int groupId, {
+    String groupId, {
     bool includeDeleted = false,
   }) async {
-    final query = includeDeleted ? '?include_deleted=true' : '';
-    final List<dynamic> json = await _api.get(
-      '/groups/$groupId/members/$query',
-    );
-    return json.map((e) => Member.fromJson(e)).toList();
+    Query<Map<String, dynamic>> query = _refs.members(groupId);
+    if (!includeDeleted) {
+      query = query.where('isRemoved', isEqualTo: false);
+    }
+    final snapshot = await query.get();
+    return snapshot.docs
+        .map((doc) => Member.fromDoc(groupId, doc))
+        .toList(growable: false);
   }
 
-  Future<void> updateMember(int groupId, int memberId, {String? name}) async {
-    await _api.put('/members/$memberId', {'name': name});
+  Future<void> updateMember(
+    String groupId,
+    String memberId, {
+    String? name,
+  }) async {
+    final cleanName = name?.trim();
+    await _refs.member(groupId, memberId).update({
+      if (cleanName != null && cleanName.isNotEmpty) 'name': cleanName,
+    });
   }
 
-  Future<void> sendTestNotification(int userId) async {
-    await _api.post('/notification/send-test-to-user', {'user_id': userId});
+  Future<void> sendTestNotification(String userId) async {
+    await _functions.httpsCallable('sendTestNotification').call({
+      'toUid': userId,
+    });
   }
 
   Future<void> sendSettlementReminder({
-    required int userId,
-    required int groupId,
+    required String userId,
+    required String groupId,
     required String groupName,
     required double amount,
     required String currencySymbol,
   }) async {
-    await _api.post('/notification/remind-settlement', {
-      'user_id': userId,
-      'group_id': groupId,
-      'group_name': groupName,
+    await _functions.httpsCallable('sendSettlementReminder').call({
+      'toUid': userId,
+      'groupId': groupId,
+      'groupName': groupName,
       'amount': amount,
-      'currency_symbol': currencySymbol,
+      'currencySymbol': currencySymbol,
     });
   }
 
-  Future<void> removeMember(int memberId, int userId) async {
-    await _api.delete('/members/$memberId?user_id=$userId');
+  Future<void> removeMember(
+    String groupId,
+    String memberId,
+    String userId,
+  ) async {
+    await _functions.httpsCallable('removeMember').call({
+      'groupId': groupId,
+      'memberId': memberId,
+    });
   }
 }
 
 final membersRepositoryProvider = Provider<MembersRepository>((ref) {
-  final api = ref.watch(apiClientProvider);
-  return MembersRepository(api);
+  return MembersRepository(
+    ref.watch(firestoreRefsProvider),
+    ref.watch(firebaseFunctionsProvider),
+  );
 });
 
 final membersFutureProvider = AsyncNotifierProvider.autoDispose
-    .family<MembersNotifier, List<Member>, int>(MembersNotifier.new);
+    .family<MembersNotifier, List<Member>, String>(MembersNotifier.new);
 
 class MembersNotifier
-    extends AutoDisposeFamilyAsyncNotifier<List<Member>, int> {
+    extends AutoDisposeFamilyAsyncNotifier<List<Member>, String> {
+  StreamSubscription<List<Member>>? _subscription;
+
   @override
-  Future<List<Member>> build(int arg) async {
+  Future<List<Member>> build(String groupId) async {
+    ref.onDispose(() => _subscription?.cancel());
+
     final repo = ref.read(membersRepositoryProvider);
-    return repo.getMembers(arg); // arg is groupId
+    final stream = repo.watchMembers(groupId);
+    final first = Completer<List<Member>>();
+
+    _subscription = stream.listen(
+      (members) {
+        if (!first.isCompleted) first.complete(members);
+        state = AsyncValue.data(members);
+      },
+      onError: (Object error, StackTrace stack) {
+        if (!first.isCompleted) first.completeError(error, stack);
+        state = AsyncValue.error(error, stack);
+      },
+    );
+
+    return first.future;
   }
 
   Future<void> addMember(String name) async {
     final repo = ref.read(membersRepositoryProvider);
-    // Optimistic or Refetch? Simple refetch is safer for list additions usually
-    // But we can optimistic add if we have an ID? We don't have ID from server without response.
-    // So we'll trigger Loading state then refetch.
-
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      await repo.addMember(arg, name);
-      return repo.getMembers(arg);
-    });
+    await repo.addMember(arg, name);
   }
 
-  Future<void> updateMember(int memberId, int userId, {String? name}) async {
+  Future<void> updateMember(
+    String memberId,
+    String userId, {
+    String? name,
+  }) async {
     final repo = ref.read(membersRepositoryProvider);
     final previousState = state;
 
-    // Optimistic Update
     if (previousState.value != null) {
       state = AsyncValue.data(
-        previousState.value!.map((m) {
-          if (m.id == memberId) {
-            return Member(
-              id: m.id,
-              groupId: m.groupId,
-              name: name ?? m.name,
-              userId: m.userId,
-              isAdmin: m.isAdmin,
-              avatarUrl: m.avatarUrl,
-              email: m.email,
-              phone: m.phone,
-              iban: m.iban,
-            );
-          }
-          return m;
-        }).toList(),
+        previousState.value!
+            .map(
+              (member) =>
+                  member.id == memberId ? member.copyWith(name: name) : member,
+            )
+            .toList(growable: false),
       );
     }
 
     try {
       await repo.updateMember(arg, memberId, name: name);
-    } catch (e) {
+    } catch (error) {
       state = previousState;
       rethrow;
     }
   }
 
-  Future<void> removeMember(int memberId, int userId) async {
+  Future<void> removeMember(String memberId, String userId) async {
     final repo = ref.read(membersRepositoryProvider);
     final previousState = state;
 
-    // Optimistic Update
     if (previousState.value != null) {
       state = AsyncValue.data(
-        previousState.value!.where((m) => m.id != memberId).toList(),
+        previousState.value!
+            .where((member) => member.id != memberId)
+            .toList(growable: false),
       );
     }
 
     try {
-      await repo.removeMember(memberId, userId);
-    } catch (e) {
+      await repo.removeMember(arg, memberId, userId);
+    } catch (error) {
       state = previousState;
       rethrow;
     }

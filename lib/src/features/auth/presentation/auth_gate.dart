@@ -1,98 +1,106 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../groups/data/groups_repository.dart';
+import '../../home/presentation/main_screen.dart';
 import '../data/auth_repository.dart';
 import 'login_screen.dart';
-import '../../home/presentation/main_screen.dart';
-import '../../groups/data/groups_repository.dart';
+
+/// Invite tokens claimed during this session. Prevents a rebuild from
+/// re-claiming the same link and showing an "already a member" error.
+final Set<String> _claimedInviteTokens = <String>{};
 
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});
 
   @override
-  @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Check for invite token in URL (Simulated Deep Link for Web/Simple Mobile)
-    // Note: On mobile, this requires deep link config (Universal Links),
-    // but for this clone we assume standard launch or web usage.
-    // If we receive "token" query param, we try to claim it.
-
-    // We can't easily get query params here without GoRouter state or parsing Uri.base
-    // For this simple implementation, we check Uri.base on build.
-
-    final uri = Uri.base;
-    final inviteToken = uri.queryParameters['token'];
-
-    if (inviteToken != null) {
-      // Allow the auth state to settle, then claim.
-      // Actually, we should only claim if logged in.
-    }
-
+    // Web invite links arrive as `/join?token=...`; on mobile the same query
+    // parameter can be added to the launch URL later (no Dynamic Links).
+    final inviteToken = Uri.base.queryParameters['token'];
     final authState = ref.watch(authControllerProvider);
 
     return authState.when(
       data: (user) {
-        if (user != null) {
-          if (inviteToken != null) {
-            return FutureBuilder(
-              future: _claimInvite(ref, inviteToken, user.id, context),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.done) {
-                  // Clear query params from URL if possible or just show MainScreen
-                  return const MainScreen();
-                }
-                return const Scaffold(
-                  body: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text('Claiming invite...'),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            );
-          }
-          return const MainScreen();
-        } else {
-          return const LoginScreen();
+        if (user == null) return const LoginScreen();
+
+        if (inviteToken != null &&
+            inviteToken.isNotEmpty &&
+            !_claimedInviteTokens.contains(inviteToken)) {
+          return _InviteClaimScreen(token: inviteToken, userId: user.id);
         }
+
+        return const MainScreen();
       },
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (err, stack) => const LoginScreen(),
     );
   }
+}
 
-  Future<void> _claimInvite(
-    WidgetRef ref,
-    String token,
-    int userId,
-    BuildContext context,
-  ) async {
-    try {
-      // Avoid double claiming if rebuilt
-      // In a real app we'd use a dedicated provider/state for this.
-      await ref.read(groupsRepositoryProvider).claimInvite(token, userId);
+/// Claims an invite once, then shows the main screen. Kept as a stateful
+/// widget so a rebuild cannot claim the same token twice.
+class _InviteClaimScreen extends ConsumerStatefulWidget {
+  const _InviteClaimScreen({required this.token, required this.userId});
 
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invite claimed successfully!')),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to claim invite: $e'),
-            backgroundColor: Colors.red,
+  final String token;
+  final String userId;
+
+  @override
+  ConsumerState<_InviteClaimScreen> createState() => _InviteClaimScreenState();
+}
+
+class _InviteClaimScreenState extends ConsumerState<_InviteClaimScreen> {
+  late final Future<void> _claim = _claimInvite();
+  bool _reported = false;
+
+  Future<void> _claimInvite() async {
+    await ref
+        .read(groupsRepositoryProvider)
+        .claimInvite(widget.token, widget.userId);
+    _claimedInviteTokens.add(widget.token);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: _claim,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done) {
+          if (!_reported) {
+            _reported = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              final error = snapshot.error;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    error == null
+                        ? 'Invite claimed successfully!'
+                        : 'Failed to claim invite: $error',
+                  ),
+                  backgroundColor: error == null ? null : Colors.red,
+                ),
+              );
+            });
+          }
+          return const MainScreen();
+        }
+
+        return const Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Claiming invite...'),
+              ],
+            ),
           ),
         );
-      }
-    }
-    // Modify history/URL if on web? No easy way without Router.
-    // We just return, MainScreen will render.
+      },
+    );
   }
 }

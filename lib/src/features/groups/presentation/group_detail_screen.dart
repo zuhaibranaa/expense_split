@@ -79,7 +79,7 @@ class GroupDetailScreen extends ConsumerWidget {
 }
 
 class _FilterActionButton extends StatefulWidget {
-  final int groupId;
+  final String groupId;
   final bool isPersonal;
 
   const _FilterActionButton({required this.groupId, this.isPersonal = false});

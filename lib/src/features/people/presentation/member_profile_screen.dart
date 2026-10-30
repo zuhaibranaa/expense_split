@@ -28,7 +28,7 @@ class MemberProfileScreen extends StatelessWidget {
               style: Theme.of(context).textTheme.headlineMedium,
               textAlign: TextAlign.center,
             ),
-            if (member.isAdmin == 1) ...[
+            if (member.isAdmin) ...[
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.symmetric(

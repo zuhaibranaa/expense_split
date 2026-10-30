@@ -1,17 +1,37 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../../../core/firebase/firestore_converters.dart';
+
 class Category {
-  final int id;
+  final String id;
   final String name;
-  final int? groupId;
+  final String? groupId;
   final String? icon;
 
-  Category({required this.id, required this.name, this.groupId, this.icon});
+  const Category({
+    required this.id,
+    required this.name,
+    this.groupId,
+    this.icon,
+  });
 
-  factory Category.fromJson(Map<String, dynamic> json) {
+  factory Category.fromDoc(
+    String groupId,
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    return Category.fromMap(groupId, doc.id, doc.data() ?? const {});
+  }
+
+  factory Category.fromMap(
+    String groupId,
+    String id,
+    Map<String, dynamic> map,
+  ) {
     return Category(
-      id: json['id'],
-      name: json['name'],
-      groupId: json['group_id'],
-      icon: json['icon'],
+      id: id,
+      name: asString(map['name'], 'General'),
+      groupId: groupId,
+      icon: asStringOrNull(map['icon']),
     );
   }
 }

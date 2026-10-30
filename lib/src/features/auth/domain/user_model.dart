@@ -1,5 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../../../core/firebase/firestore_converters.dart';
+
 class User {
-  final int id;
+  final String id;
   final String email;
   final String name;
   final String? avatarUrl;
@@ -8,59 +12,96 @@ class User {
   final String? iban;
   final bool isVerified;
   final bool hasPassword;
-  final double balance;
   final bool isPremium;
+  final DateTime? premiumUntil;
+  final String? personalGroupId;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
-  User({
+  const User({
     required this.id,
     required this.email,
     required this.name,
     this.avatarUrl,
-    required this.defaultCurrency,
+    this.defaultCurrency = 'USD',
     this.phone,
     this.iban,
     this.isVerified = false,
     this.hasPassword = true,
-    this.balance = 0.0,
     this.isPremium = false,
+    this.premiumUntil,
+    this.personalGroupId,
+    this.createdAt,
+    this.updatedAt,
   });
 
-  factory User.fromJson(Map<String, dynamic> json) {
+  factory User.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    return User.fromMap(doc.id, doc.data() ?? const {});
+  }
+
+  factory User.fromMap(String id, Map<String, dynamic> map) {
     return User(
-      id: json['id'],
-      email: json['email'],
-      name: json['name'],
-      avatarUrl: json['avatar_url'],
-      defaultCurrency: json['default_currency'] ?? 'USD',
-      phone: json['phone'],
-      iban: json['iban'],
-      isVerified: json['is_verified'] == 1 || json['is_verified'] == true,
-      hasPassword: json['has_password'] ?? true,
-      balance: (json['balance'] ?? 0).toDouble(),
-      isPremium:
-          json['is_active_premium'] == 1 || json['is_active_premium'] == true,
+      id: id,
+      email: asString(map['email']),
+      name: asString(map['name'], asString(map['email']).split('@').first),
+      avatarUrl: asStringOrNull(map['avatarUrl']),
+      defaultCurrency: asString(map['defaultCurrency'], 'USD'),
+      phone: asStringOrNull(map['phone']),
+      iban: asStringOrNull(map['iban']),
+      isVerified: asBool(map['isVerified']),
+      hasPassword: asBool(map['hasPassword'], true),
+      isPremium: asBool(map['isPremium']),
+      premiumUntil: timestampToDate(map['premiumUntil']),
+      personalGroupId: asStringOrNull(map['personalGroupId']),
+      createdAt: timestampToDate(map['createdAt']),
+      updatedAt: timestampToDate(map['updatedAt']),
     );
   }
-  Map<String, dynamic> toJson() {
+
+  User copyWith({
+    String? name,
+    String? email,
+    String? avatarUrl,
+    String? defaultCurrency,
+    String? phone,
+    String? iban,
+    bool? isVerified,
+    bool? hasPassword,
+    bool? isPremium,
+    DateTime? premiumUntil,
+    String? personalGroupId,
+  }) {
+    return User(
+      id: id,
+      email: email ?? this.email,
+      name: name ?? this.name,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      defaultCurrency: defaultCurrency ?? this.defaultCurrency,
+      phone: phone ?? this.phone,
+      iban: iban ?? this.iban,
+      isVerified: isVerified ?? this.isVerified,
+      hasPassword: hasPassword ?? this.hasPassword,
+      isPremium: isPremium ?? this.isPremium,
+      premiumUntil: premiumUntil ?? this.premiumUntil,
+      personalGroupId: personalGroupId ?? this.personalGroupId,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
     return {
-      'id': id,
       'email': email,
       'name': name,
-      'avatar_url': avatarUrl,
-      'default_currency': defaultCurrency,
+      'avatarUrl': avatarUrl,
+      'defaultCurrency': defaultCurrency,
       'phone': phone,
       'iban': iban,
-      'is_verified': isVerified,
-      'has_password': hasPassword,
-      'balance': balance,
-      'is_active_premium': isPremium,
+      'isVerified': isVerified,
+      'hasPassword': hasPassword,
+      'isPremium': isPremium,
+      'premiumUntil': dateToTimestamp(premiumUntil),
+      'personalGroupId': personalGroupId,
     };
   }
-}
-
-class AuthResponse {
-  final User user;
-  final String token;
-
-  AuthResponse({required this.user, required this.token});
 }

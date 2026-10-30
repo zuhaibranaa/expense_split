@@ -1,0 +1,31 @@
+{
+  "name": "equisplit-functions",
+  "private": true,
+  "description": "Cloud Functions for EquiSplit",
+  "engines": {
+    "node": "20"
+  },
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "clean": "rm -rf lib",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "lint": "tsc --noEmit",
+    "test": "node --test test/rules.test.js",
+    "test:rules": "node --test test/rules.test.js",
+    "test:integration": "node --test --test-concurrency=1 test/integration/"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.5.0",
+    "firebase-functions": "^6.6.0"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "@types/node": "^20.19.0",
+    "firebase": "^13.1.0",
+    "typescript": "^5.9.0"
+  }
+}

@@ -9,7 +9,7 @@ import '../../cash_inflows/domain/cash_inflow_model.dart';
 import 'package:intl/intl.dart';
 
 class GroupStatsScreen extends ConsumerStatefulWidget {
-  final int groupId;
+  final String groupId;
   final String groupCurrency;
   final bool isPersonal;
 
@@ -453,13 +453,13 @@ class _GroupStatsScreenState extends ConsumerState<GroupStatsScreen> {
       ..sort((a, b) => b.value.compareTo(a.value));
 
     // 3. Top Spender
-    final payerMap = <int, double>{};
-    final payersInfo = <int, String>{};
+    final payerMap = <String, double>{};
+    final payersInfo = <String, String>{};
     for (var e in expenses) {
       if (e.isSettlement) continue;
       payerMap[e.payerId] = (payerMap[e.payerId] ?? 0) + e.amount;
-      if (e.payer != null) {
-        payersInfo[e.payerId] = e.payer!.name;
+      if (e.payerName.isNotEmpty) {
+        payersInfo[e.payerId] = e.payerName;
       }
     }
 

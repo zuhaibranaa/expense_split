@@ -41,7 +41,7 @@ class StatsScreen extends ConsumerWidget {
 }
 
 class _StatsContent extends ConsumerStatefulWidget {
-  final List<int> groupIds;
+  final List<String> groupIds;
   const _StatsContent({required this.groupIds});
 
   @override
@@ -371,13 +371,15 @@ final allGroupsExpensesProvider = FutureProvider.family<List<Expense>, String>((
   ref,
   groupIdsString,
 ) async {
-  // Changed List<int> to String
   final repo = ref.watch(expensesRepositoryProvider);
   final allExpenses = <Expense>[];
 
   if (groupIdsString.isEmpty) return [];
 
-  final groupIds = groupIdsString.split(',').map(int.parse).toList();
+  final groupIds = groupIdsString
+      .split(',')
+      .where((id) => id.isNotEmpty)
+      .toList();
 
   // Parallel fetch could be better but sticking to simple loop for now
   for (var id in groupIds) {

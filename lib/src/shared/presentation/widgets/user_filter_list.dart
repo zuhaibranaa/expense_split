@@ -4,8 +4,8 @@ import 'user_avatar.dart';
 
 class UserFilterList extends StatelessWidget {
   final List<Member> members;
-  final int? selectedMemberId;
-  final ValueChanged<int?> onSelected;
+  final String? selectedMemberId;
+  final ValueChanged<String?> onSelected;
 
   const UserFilterList({
     super.key,

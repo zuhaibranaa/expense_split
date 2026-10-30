@@ -17,7 +17,7 @@ import 'expenses_providers.dart';
 enum SplitMethod { equal, exact }
 
 class AddExpenseScreen extends ConsumerStatefulWidget {
-  final int groupId;
+  final String groupId;
   final String groupCurrency; // Add group currency
   final bool isPersonal;
 
@@ -43,16 +43,16 @@ class AddExpenseScreen extends ConsumerStatefulWidget {
 class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   final _descriptionController = TextEditingController();
   final _amountController = TextEditingController();
-  int? _selectedPayerId;
+  String? _selectedPayerId;
   bool _isMultiplePayers = false;
-  final Map<int, TextEditingController> _payerControllers = {};
-  final Set<int> _selectedPayerIds = {};
+  final Map<String, TextEditingController> _payerControllers = {};
+  final Set<String> _selectedPayerIds = {};
   String? _selectedCategory;
   List<Category> _categories = [];
 
-  final Set<int> _selectedMemberIds = {};
+  final Set<String> _selectedMemberIds = {};
   SplitMethod _splitMethod = SplitMethod.equal;
-  final Map<int, TextEditingController> _splitControllers = {};
+  final Map<String, TextEditingController> _splitControllers = {};
   bool _isInit = true;
   bool _isLoading = false;
   InterstitialAd? _interstitialAd;
@@ -179,7 +179,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               for (var m in members) {
                 final split = widget.expense!.splits.firstWhere(
                   (s) => s.memberId == m.id,
-                  orElse: () => ExpenseSplit(id: -1, memberId: m.id, amount: 0),
+                  orElse: () => ExpenseSplit(memberId: m.id, amount: 0),
                 );
                 final c = TextEditingController(
                   text: split.amount.toStringAsFixed(2),
@@ -235,7 +235,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 // Payer (Hide if Income)
                 if (!widget.isIncome && !widget.isPersonal) ...[
                   if (!_isMultiplePayers)
-                    DropdownButtonFormField<int>(
+                    DropdownButtonFormField<String>(
                       initialValue: _selectedPayerId,
                       decoration: const InputDecoration(
                         labelText: 'Paid By',
@@ -243,7 +243,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                       ),
                       items: [
                         const DropdownMenuItem(
-                          value: -1,
+                          value: '',
                           child: Text("Multiple people"),
                         ),
                         ...members.map((m) {
@@ -262,7 +262,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                         }),
                       ],
                       onChanged: (val) {
-                        if (val == -1) {
+                        if (val == '') {
                           setState(() {
                             _isMultiplePayers = true;
                             // Initialize selected payers (default to none or handle in dialog)
@@ -705,10 +705,10 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     );
   }
 
-  final Set<int> _manuallyEditedMemberIds = {};
+  final Set<String> _manuallyEditedMemberIds = {};
   bool _isProgrammaticUpdate = false;
 
-  void _onSplitAmountChanged(int changedMemberId, List<Member> members) {
+  void _onSplitAmountChanged(String changedMemberId, List<Member> members) {
     if (_isProgrammaticUpdate) return;
     if (_splitMethod != SplitMethod.exact) return;
 
@@ -832,7 +832,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     setState(() {});
   }
 
-  TextEditingController _getOrCreatePayerController(int memberId) {
+  TextEditingController _getOrCreatePayerController(String memberId) {
     if (!_payerControllers.containsKey(memberId)) {
       final c = TextEditingController(text: '0.00');
       c.addListener(_onPaymentAmountChanged);
@@ -904,8 +904,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     );
   }
 
-  final Map<int, FocusNode> _splitFocusNodes = {};
-  final Map<int, String> _tempSplitValues = {};
+  final Map<String, FocusNode> _splitFocusNodes = {};
+  final Map<String, String> _tempSplitValues = {};
 
   void _submit(List<Member> members) async {
     final desc = _descriptionController.text.trim();
@@ -947,9 +947,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     }
 
     // Calculate Payments & Splits (expense only)
-    Map<int, double>? payments;
-    int? finalPayerId = _selectedPayerId;
-    final Map<int, double> splits = {};
+    Map<String, double>? payments;
+    String? finalPayerId = _selectedPayerId;
+    final Map<String, double> splits = {};
 
     if (!isIncomeMode) {
       final activeMembers = members
@@ -958,7 +958,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
       if (_isMultiplePayers) {
         double paymentsSum = 0.0;
-        final Map<int, double> tempPayments = {};
+        final Map<String, double> tempPayments = {};
 
         for (var m in members) {
           if (!_selectedPayerIds.contains(m.id)) continue;
@@ -1041,7 +1041,6 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 date: DateTime.now(),
               );
           ref.invalidate(inflowsListProvider(widget.groupId));
-          await ref.read(authControllerProvider.notifier).reloadUser();
           if (!mounted) return;
           if (_interstitialAd != null) {
             _interstitialAd!.show();
@@ -1061,7 +1060,6 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 date: widget.inflow!.date,
               );
           ref.invalidate(inflowsListProvider(widget.groupId));
-          await ref.read(authControllerProvider.notifier).reloadUser();
           if (navigator.mounted) navigator.pop();
         }
       } else {
@@ -1079,8 +1077,6 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 payments: payments,
               );
           ref.invalidate(unfilteredExpensesFutureProvider(widget.groupId));
-          // Refresh User to update balance
-          await ref.read(authControllerProvider.notifier).reloadUser();
           if (_interstitialAd != null) {
             _interstitialAd!.show();
           } else {
@@ -1103,8 +1099,6 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                   payments: payments,
                 );
             ref.invalidate(unfilteredExpensesFutureProvider(widget.groupId));
-            // Refresh User to update balance
-            await ref.read(authControllerProvider.notifier).reloadUser();
           }
           if (navigator.mounted) navigator.pop();
         }

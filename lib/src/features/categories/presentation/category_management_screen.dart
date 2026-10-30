@@ -5,7 +5,7 @@ import '../../categories/data/categories_repository.dart';
 import '../../auth/data/auth_repository.dart';
 
 class CategoryManagementScreen extends ConsumerStatefulWidget {
-  final int groupId;
+  final String groupId;
   const CategoryManagementScreen({super.key, required this.groupId});
 
   @override
@@ -62,7 +62,7 @@ class _CategoryManagementScreenState
     }
   }
 
-  void _deleteCategory(int categoryId) async {
+  void _deleteCategory(String categoryId) async {
     try {
       await ref
           .read(categoriesRepositoryProvider)

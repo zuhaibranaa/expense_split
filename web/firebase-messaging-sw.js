@@ -1,34 +1,68 @@
-importScripts("https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js");
-importScripts("https://www.gstatic.com/firebasejs/8.10.0/firebase-messaging.js");
+// Firebase Cloud Messaging service worker for the EquiSplit web app.
+// Keep this config in sync with the `web` entry in lib/firebase_options.dart.
+importScripts(
+  'https://www.gstatic.com/firebasejs/13.1.0/firebase-app-compat.js',
+);
+importScripts(
+  'https://www.gstatic.com/firebasejs/13.1.0/firebase-messaging-compat.js',
+);
 
 firebase.initializeApp({
-    apiKey: "AIzaSyD0lD2lD2lD2lD2lD2lD2lD2lD2lD2lD2l",
-    authDomain: "equisplit-d4c74.firebaseapp.com",
-    projectId: "equisplit-d4c74",
-    storageBucket: "equisplit-d4c74.appspot.com",
-    messagingSenderId: "108752414224018650707",
-    appId: "1:108752414224018650707:web:cd454e52e6f6ba425d4111",
-    measurementId: "G-1234567890"
+  apiKey: 'AIzaSyBJVfTWvOFYsZPxPqfNHbe_LtF5m8pShvs',
+  appId: '1:931195916704:web:576425aea48bb46a6294c5',
+  messagingSenderId: '931195916704',
+  projectId: 'equisplit-d4c74',
+  authDomain: 'equisplit-d4c74.firebaseapp.com',
+  storageBucket: 'equisplit-d4c74.firebasestorage.app',
+  measurementId: 'G-9JMENZQ0BH',
 });
 
 const messaging = firebase.messaging();
 
-messaging.onBackgroundMessage(function (payload) {
-    console.log('[firebase-messaging-sw.js] Received background message ', payload);
-    // Customize notification here
-    const notificationTitle = payload.notification.title;
-    const notificationOptions = {
-        body: payload.notification.body,
-        icon: '/icons/Icon-192.png'
-    };
+messaging.onBackgroundMessage((payload) => {
+  // Notification messages are displayed by the SDK. Only data-only messages
+  // need a manual notification here.
+  if (payload.notification) return;
 
-    self.registration.showNotification(notificationTitle, notificationOptions);
+  const data = payload.data || {};
+  const title = data.title || 'EquiSplit';
+  const body = data.body || 'You have a new update.';
+
+  self.registration.showNotification(title, {
+    body,
+    icon: '/icons/Icon-192.png',
+    badge: '/icons/Icon-192.png',
+    data,
+  });
 });
 
-self.addEventListener('notificationclick', function (event) {
-    console.log('[firebase-messaging-sw.js] Notification click event');
-    event.notification.close();
-    event.waitUntil(
-        clients.openWindow('https://equisplit-d4c74.web.app/')
-    );
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const data = event.notification.data || {};
+  const groupId = data.group_id;
+  const targetUrl = groupId
+    ? `/?group=${encodeURIComponent(groupId)}`
+    : '/';
+
+  event.waitUntil(
+    (async () => {
+      const windows = await clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true,
+      });
+
+      for (const client of windows) {
+        if ('focus' in client) {
+          await client.focus();
+          if ('navigate' in client) {
+            await client.navigate(targetUrl);
+          }
+          return;
+        }
+      }
+
+      return clients.openWindow(targetUrl);
+    })(),
+  );
 });

@@ -11,7 +11,7 @@ import 'package:equisplit/src/features/people/domain/member_model.dart';
 import 'package:equisplit/src/shared/utils/currency_utils.dart';
 
 class GlobalSettlementItem {
-  final int groupId;
+  final String groupId;
   final String groupName;
   final String groupCurrency;
   final Member me;
@@ -52,10 +52,10 @@ final globalSettlementsProvider =
           // Find myself in this group
           final me = members.firstWhere(
             (m) => m.userId == user.id,
-            orElse: () => Member(id: -1, groupId: group.id, name: ''),
+            orElse: () => Member(id: '', groupId: group.id, name: ''),
           );
 
-          if (me.id == -1) return; // Not a member of this group
+          if (me.id.isEmpty) return; // Not a member of this group
 
           final expenses = await expensesRepo.getExpenses(group.id);
           final transfers = BalanceCalculator.calculateBalances(
@@ -69,9 +69,9 @@ final globalSettlementsProvider =
               final other = members.firstWhere(
                 (m) => m.id == transfer.toMemberId,
                 orElse: () =>
-                    Member(id: -1, groupId: group.id, name: 'Unknown'),
+                    Member(id: '', groupId: group.id, name: 'Unknown'),
               );
-              if (other.id == -1) continue; // Skip unknown members
+              if (other.id.isEmpty) continue; // Skip unknown members
 
               items.add(
                 GlobalSettlementItem(
@@ -88,9 +88,9 @@ final globalSettlementsProvider =
               final other = members.firstWhere(
                 (m) => m.id == transfer.fromMemberId,
                 orElse: () =>
-                    Member(id: -1, groupId: group.id, name: 'Unknown'),
+                    Member(id: '', groupId: group.id, name: 'Unknown'),
               );
-              if (other.id == -1) continue; // Skip unknown members
+              if (other.id.isEmpty) continue; // Skip unknown members
 
               items.add(
                 GlobalSettlementItem(

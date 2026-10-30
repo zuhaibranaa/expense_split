@@ -17,7 +17,7 @@ import '../../cash_inflows/domain/cash_inflow_model.dart';
 import '../../cash_inflows/data/cash_inflow_repository.dart';
 
 class ExpensesListScreen extends ConsumerStatefulWidget {
-  final int groupId;
+  final String groupId;
   final String groupCurrency;
   final bool isPersonal;
 
@@ -34,22 +34,11 @@ class ExpensesListScreen extends ConsumerStatefulWidget {
 
 class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
   // Getters for easy access without changing entire file content logic
-  int get groupId => widget.groupId;
+  String get groupId => widget.groupId;
   String get groupCurrency => widget.groupCurrency;
   bool get isPersonal => widget.isPersonal;
 
   bool _isFabExpanded = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // Fetch fresh balance from server whenever the personal expenses tab is opened.
-    if (isPersonal) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(authControllerProvider.notifier).reloadUser();
-      });
-    }
-  }
 
   void _toggleFab() {
     setState(() {
@@ -84,7 +73,6 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
           if (isPersonal) {
             // ignore: unused_result
             ref.refresh(inflowsListProvider(groupId));
-            ref.read(authControllerProvider.notifier).reloadUser();
           }
         });
   }
@@ -288,7 +276,7 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            '${ref.watch(authControllerProvider).value?.defaultCurrency ?? ""} ${ref.watch(authControllerProvider).value?.balance.toStringAsFixed(2) ?? "0.00"}',
+                            '${ref.watch(authControllerProvider).value?.defaultCurrency ?? ""} ${ref.watch(personalBalanceProvider).value?.toStringAsFixed(2) ?? "0.00"}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 36,
@@ -312,10 +300,6 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                         if (isPersonal) {
                           // ignore: unused_result
                           ref.refresh(inflowsListProvider(groupId));
-                          // Reload user for balance update
-                          await ref
-                              .read(authControllerProvider.notifier)
-                              .reloadUser();
                         }
                       },
                       child: mergedItems.isEmpty
@@ -358,7 +342,7 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                                       ?.firstWhere(
                                         (m) => m.userId == user?.id,
                                         orElse: () => Member(
-                                          id: -1,
+                                          id: '',
                                           groupId: groupId,
                                           name: '',
                                         ),
@@ -383,8 +367,8 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
 
                                   return ListTile(
                                     leading: _buildAvatar(
-                                      expense.payer?.name,
-                                      expense.payer?.avatarUrl,
+                                      expense.payerName,
+                                      null,
                                       radius: 20,
                                     ),
                                     title: Text(
@@ -454,14 +438,14 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                                                               m.id ==
                                                               split.memberId,
                                                           orElse: () => Member(
-                                                            id: -1,
-                                                            groupId: -1,
+                                                            id: '',
+                                                            groupId: '',
                                                             name: 'User',
                                                           ),
                                                         );
 
                                                     if (member == null ||
-                                                        member.id == -1) {
+                                                        member.id.isEmpty) {
                                                       return const SizedBox();
                                                     }
 
@@ -499,7 +483,7 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                                         Text(
                                           (expense.payments.length > 1)
                                               ? 'Paid by ${expense.payments.length}'
-                                              : 'Paid by ${expense.payer?.name ?? 'Unknown'}',
+                                              : 'Paid by ${expense.payerName}',
                                           style: const TextStyle(
                                             fontSize: 10,
                                             color: Colors.white70,
@@ -825,7 +809,7 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                             final member = members.firstWhere(
                               (m) => m.id == p.memberId,
                               orElse: () =>
-                                  Member(id: -1, groupId: -1, name: 'Unknown'),
+                                  Member(id: '', groupId: '', name: 'Unknown'),
                             );
                             return Tooltip(
                               message:
@@ -858,9 +842,9 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                               .firstWhere(
                                 (m) => m.id == expense.payerId,
                                 orElse: () => Member(
-                                  id: -1,
-                                  groupId: -1,
-                                  name: expense.payer?.name ?? 'Unknown',
+                                  id: '',
+                                  groupId: '',
+                                  name: expense.payerName,
                                 ),
                               )
                               .name,
@@ -868,9 +852,9 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                               .firstWhere(
                                 (m) => m.id == expense.payerId,
                                 orElse: () => Member(
-                                  id: -1,
-                                  groupId: -1,
-                                  name: expense.payer?.name ?? 'Unknown',
+                                  id: '',
+                                  groupId: '',
+                                  name: expense.payerName,
                                 ),
                               )
                               .avatarUrl,
@@ -902,7 +886,7 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                             final memberValue = members.firstWhere(
                               (m) => m.id == split.memberId,
                               orElse: () =>
-                                  Member(id: -1, groupId: -1, name: 'User'),
+                                  Member(id: '', groupId: '', name: 'User'),
                             );
                             return Tooltip(
                               message:
@@ -1021,7 +1005,6 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                       ).then((_) {
                         // ignore: unused_result
                         ref.refresh(expensesFutureProvider(widget.groupId));
-                        ref.read(authControllerProvider.notifier).reloadUser();
                       });
                     },
                     style: FilledButton.styleFrom(
@@ -1261,9 +1244,6 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
 
                           // Refresh Logic
                           if (context.mounted) {
-                            ref
-                                .read(authControllerProvider.notifier)
-                                .reloadUser();
                             // ignore: unused_result
                             ref.refresh(expensesFutureProvider(widget.groupId));
                             if (isPersonal) {
@@ -1323,7 +1303,6 @@ class _ExpensesListScreenState extends ConsumerState<ExpensesListScreen> {
                           // ignore: unused_result
                           ref.refresh(inflowsListProvider(widget.groupId));
                         }
-                        ref.read(authControllerProvider.notifier).reloadUser();
                       });
                     },
                     style: FilledButton.styleFrom(

@@ -10,7 +10,7 @@ import 'package:equisplit/src/shared/presentation/widgets/user_avatar.dart';
 import 'expenses_providers.dart';
 
 class PaymentsListScreen extends ConsumerWidget {
-  final int groupId;
+  final String groupId;
   final String groupCurrency;
 
   const PaymentsListScreen({
@@ -86,13 +86,13 @@ class PaymentsListScreen extends ConsumerWidget {
                 final payer = members.firstWhere(
                   (m) => m.id == payerId,
                   orElse: () =>
-                      Member(id: -1, groupId: groupId, name: 'Unknown'),
+                      Member(id: '', groupId: groupId, name: 'Unknown'),
                 );
 
                 final receiver = members.firstWhere(
                   (m) => m.id == receiverId,
                   orElse: () =>
-                      Member(id: -1, groupId: groupId, name: 'Unknown'),
+                      Member(id: '', groupId: groupId, name: 'Unknown'),
                 );
 
                 return ListTile(
@@ -370,9 +370,6 @@ class PaymentsListScreen extends ConsumerWidget {
                           ref.invalidate(
                             unfilteredExpensesFutureProvider(groupId),
                           );
-                          ref
-                              .read(authControllerProvider.notifier)
-                              .reloadUser();
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Payment deleted')),
                           );

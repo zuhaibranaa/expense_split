@@ -1,225 +1,330 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../shared/data/api_client.dart';
+
+import '../../../core/firebase/firestore_converters.dart';
+import '../../../core/firebase/firestore_refs.dart';
+import '../../groups/data/groups_repository.dart';
 import '../domain/expense_model.dart';
-import '../presentation/expenses_providers.dart'; // For filter providers
-// Needed if we reference Member
+import '../presentation/expenses_providers.dart';
 
 class ExpensesRepository {
-  final ApiClient _api;
+  ExpensesRepository(this._refs, this._auth);
 
-  ExpensesRepository(this._api);
+  final FirestoreRefs _refs;
+  final FirebaseAuth _auth;
 
-  Future<void> createExpense({
-    required int groupId,
-    required String description,
-    required double amount,
-    required int payerId,
-    required String category,
-    required DateTime date,
-    required Map<int, double> splits,
-    Map<int, double>? payments,
-    bool isSettlement = false,
-  }) async {
-    final splitsList = splits.entries
-        .map((e) => {'member_id': e.key, 'amount': e.value})
-        .toList();
+  String get _uid => _auth.currentUser?.uid ?? '';
 
-    List<Map<String, dynamic>>? paymentsList;
-    if (payments != null) {
-      paymentsList = payments.entries
-          .map((e) => {'member_id': e.key, 'amount': e.value})
-          .toList();
-    }
-
-    await _api.post('/groups/$groupId/expenses/', {
-      'description': description,
-      'amount': amount,
-      'payer_id': payerId,
-      'category': category,
-      'date': date.toIso8601String(),
-      'is_settlement': isSettlement,
-      'splits': splitsList,
-      if (paymentsList != null) 'payments': paymentsList,
-    });
+  Stream<List<Expense>> watchExpenses(
+    String groupId, {
+    DateTime? startDate,
+    DateTime? endDate,
+    String? memberId,
+  }) {
+    return _query(
+      groupId,
+      startDate: startDate,
+      endDate: endDate,
+      memberId: memberId,
+    ).snapshots().map(
+      (snapshot) => snapshot.docs
+          .map((doc) => Expense.fromDoc(groupId, doc))
+          .toList(growable: false),
+    );
   }
 
   Future<List<Expense>> getExpenses(
-    int groupId, {
+    String groupId, {
     DateTime? startDate,
     DateTime? endDate,
-    int? memberId,
+    String? memberId,
   }) async {
-    final queryParams = <String, String>{};
-    if (startDate != null) {
-      queryParams['start_date'] = startDate.toIso8601String();
-    }
-    if (endDate != null) {
-      queryParams['end_date'] = endDate.toIso8601String();
-    }
-    if (memberId != null) {
-      queryParams['member_id'] = memberId.toString();
-    }
-
-    // ApiClient handles base URL, but we need to check if it handles full Uri or just path string
-    // Assuming ApiClient.get takes a string path. We construct query string manually if needed or rely on ApiClient.
-    // Let's check api_client.dart usage. It seems to take a string path.
-    // So we append query string.
-
-    String path = '/groups/$groupId/expenses/';
-    if (queryParams.isNotEmpty) {
-      path += '?${Uri(queryParameters: queryParams).query}';
-    }
-
-    final List<dynamic> json = await _api.get(path);
-    return json.map((e) => Expense.fromJson(e)).toList();
+    final snapshot = await _query(
+      groupId,
+      startDate: startDate,
+      endDate: endDate,
+      memberId: memberId,
+    ).get();
+    return snapshot.docs
+        .map((doc) => Expense.fromDoc(groupId, doc))
+        .toList(growable: false);
   }
 
-  Future<void> updateExpense({
-    required int groupId,
-    required int expenseId,
-    required int userId,
+  Query<Map<String, dynamic>> _query(
+    String groupId, {
+    DateTime? startDate,
+    DateTime? endDate,
+    String? memberId,
+  }) {
+    Query<Map<String, dynamic>> query = _refs.expenses(groupId);
+    if (startDate != null) {
+      query = query.where(
+        'date',
+        isGreaterThanOrEqualTo: Timestamp.fromDate(_startOfDay(startDate)),
+      );
+    }
+    if (endDate != null) {
+      query = query.where(
+        'date',
+        isLessThanOrEqualTo: Timestamp.fromDate(_endOfDay(endDate)),
+      );
+    }
+    if (memberId != null && memberId.isNotEmpty) {
+      query = query.where('memberIds', arrayContains: memberId);
+    }
+    return query.orderBy('date', descending: true);
+  }
+
+  Future<void> createExpense({
+    required String groupId,
     required String description,
     required double amount,
-    required int payerId,
+    required String payerId,
+    String payerName = '',
     required String category,
     required DateTime date,
-    required Map<int, double> splits,
-    Map<int, double>? payments,
+    required Map<String, double> splits,
+    Map<String, double>? payments,
+    bool isSettlement = false,
   }) async {
-    final splitsList = splits.entries
-        .map((e) => {'member_id': e.key, 'amount': e.value})
-        .toList();
-
-    List<Map<String, dynamic>>? paymentsList;
-    if (payments != null) {
-      paymentsList = payments.entries
-          .map((e) => {'member_id': e.key, 'amount': e.value})
-          .toList();
+    if (description.trim().isEmpty) {
+      throw ArgumentError('Description cannot be empty.');
+    }
+    if (amount <= 0) {
+      throw ArgumentError('Amount must be greater than zero.');
+    }
+    if (splits.isEmpty) {
+      throw ArgumentError('Select at least one person to split with.');
     }
 
-    await _api.put('/expenses/$expenseId?user_id=$userId', {
-      'description': description,
-      'amount': amount,
-      'payer_id': payerId,
+    final memberIds = Expense.buildMemberIds(
+      payerId: payerId,
+      splits: splits,
+      payments: payments,
+    );
+
+    await _refs.expenses(groupId).add({
+      'description': description.trim(),
+      'amount': roundMoney(amount),
       'category': category,
-      'date': date.toIso8601String(),
-      'splits': splitsList,
-      if (paymentsList != null) 'payments': paymentsList,
+      'payerId': payerId,
+      'payerName': payerName,
+      'date': Timestamp.fromDate(date),
+      'isSettlement': isSettlement,
+      'splits': splits.entries
+          .map(
+            (entry) => {
+              'memberId': entry.key,
+              'amount': roundMoney(entry.value),
+            },
+          )
+          .toList(growable: false),
+      'payments': (payments ?? const <String, double>{}).entries
+          .map(
+            (entry) => {
+              'memberId': entry.key,
+              'amount': roundMoney(entry.value),
+            },
+          )
+          .toList(growable: false),
+      'memberIds': memberIds,
+      'createdBy': _uid,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
     });
   }
 
-  Future<void> deleteExpense(int expenseId, int userId) async {
-    await _api.delete('/expenses/$expenseId?user_id=$userId');
+  Future<void> updateExpense({
+    required String groupId,
+    required String expenseId,
+    required String userId,
+    required String description,
+    required double amount,
+    required String payerId,
+    String payerName = '',
+    required String category,
+    required DateTime date,
+    required Map<String, double> splits,
+    Map<String, double>? payments,
+  }) async {
+    final memberIds = Expense.buildMemberIds(
+      payerId: payerId,
+      splits: splits,
+      payments: payments,
+    );
+
+    await _refs.expense(groupId, expenseId).update({
+      'description': description.trim(),
+      'amount': roundMoney(amount),
+      'category': category,
+      'payerId': payerId,
+      'payerName': payerName,
+      'date': Timestamp.fromDate(date),
+      'splits': splits.entries
+          .map(
+            (entry) => {
+              'memberId': entry.key,
+              'amount': roundMoney(entry.value),
+            },
+          )
+          .toList(growable: false),
+      'payments': (payments ?? const <String, double>{}).entries
+          .map(
+            (entry) => {
+              'memberId': entry.key,
+              'amount': roundMoney(entry.value),
+            },
+          )
+          .toList(growable: false),
+      'memberIds': memberIds,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
+
+  Future<void> deleteExpense({
+    required String groupId,
+    required String expenseId,
+    required String userId,
+  }) async {
+    await _refs.expense(groupId, expenseId).delete();
+  }
+
+  static DateTime _startOfDay(DateTime date) =>
+      DateTime(date.year, date.month, date.day);
+
+  static DateTime _endOfDay(DateTime date) =>
+      DateTime(date.year, date.month, date.day, 23, 59, 59, 999);
 }
 
 final expensesRepositoryProvider = Provider<ExpensesRepository>((ref) {
-  final api = ref.watch(apiClientProvider);
-  return ExpensesRepository(api);
+  return ExpensesRepository(
+    ref.watch(firestoreRefsProvider),
+    ref.watch(firebaseAuthProvider),
+  );
 });
 
 final expensesFutureProvider = AsyncNotifierProvider.autoDispose
-    .family<ExpensesNotifier, List<Expense>, int>(ExpensesNotifier.new);
+    .family<ExpensesNotifier, List<Expense>, String>(ExpensesNotifier.new);
 
 class ExpensesNotifier
-    extends AutoDisposeFamilyAsyncNotifier<List<Expense>, int> {
-  @override
-  Future<List<Expense>> build(int arg) async {
-    final repo = ref.read(expensesRepositoryProvider);
-    final dateRange = ref.watch(expenseDateRangeFilterProvider(arg));
-    final memberId = ref.watch(expenseUserFilterProvider(arg));
+    extends AutoDisposeFamilyAsyncNotifier<List<Expense>, String> {
+  StreamSubscription<List<Expense>>? _subscription;
 
-    return repo.getExpenses(
-      arg,
+  @override
+  Future<List<Expense>> build(String groupId) async {
+    ref.onDispose(() => _subscription?.cancel());
+
+    final repo = ref.read(expensesRepositoryProvider);
+    final dateRange = ref.watch(expenseDateRangeFilterProvider(groupId));
+    final memberId = ref.watch(expenseUserFilterProvider(groupId));
+
+    final stream = repo.watchExpenses(
+      groupId,
       startDate: dateRange?.start,
       endDate: dateRange?.end,
       memberId: memberId,
     );
+    final first = Completer<List<Expense>>();
+
+    _subscription = stream.listen(
+      (expenses) {
+        if (!first.isCompleted) first.complete(expenses);
+        state = AsyncValue.data(expenses);
+      },
+      onError: (Object error, StackTrace stack) {
+        if (!first.isCompleted) first.completeError(error, stack);
+        state = AsyncValue.error(error, stack);
+      },
+    );
+
+    return first.future;
   }
 
   Future<void> createExpense({
     required String description,
     required double amount,
-    required int payerId,
+    required String payerId,
     required String category,
     required DateTime date,
-    required Map<int, double> splits,
-    Map<int, double>? payments,
+    required Map<String, double> splits,
+    Map<String, double>? payments,
     bool isSettlement = false,
   }) async {
     final repo = ref.read(expensesRepositoryProvider);
-
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      await repo.createExpense(
-        groupId: arg,
-        description: description,
-        amount: amount,
-        payerId: payerId,
-        category: category,
-        date: date,
-        splits: splits,
-        payments: payments,
-        isSettlement: isSettlement,
-      );
-      return repo.getExpenses(arg);
-    });
+    await repo.createExpense(
+      groupId: arg,
+      description: description,
+      amount: amount,
+      payerId: payerId,
+      payerName: _memberName(payerId),
+      category: category,
+      date: date,
+      splits: splits,
+      payments: payments,
+      isSettlement: isSettlement,
+    );
   }
 
   Future<void> updateExpense({
-    required int expenseId,
-    required int userId,
+    required String expenseId,
+    required String userId,
     required String description,
     required double amount,
-    required int payerId,
+    required String payerId,
     required String category,
     required DateTime date,
-    required Map<int, double> splits,
-    Map<int, double>? payments,
+    required Map<String, double> splits,
+    Map<String, double>? payments,
   }) async {
     final repo = ref.read(expensesRepositoryProvider);
-    // Optimistic Update (Complex due to splits, but we can try basic fields if needed)
-    // For now, let's just use refetch for safety as backend calculation is important?
-    // Actually, local update is fine if we reconstruct Expense object.
+    await repo.updateExpense(
+      groupId: arg,
+      expenseId: expenseId,
+      userId: userId,
+      description: description,
+      amount: amount,
+      payerId: payerId,
+      payerName: _memberName(payerId),
+      category: category,
+      date: date,
+      splits: splits,
+      payments: payments,
+    );
+  }
+
+  Future<void> deleteExpense(String expenseId, String userId) async {
+    final repo = ref.read(expensesRepositoryProvider);
+    final previousState = state;
+
+    if (previousState.value != null) {
+      state = AsyncValue.data(
+        previousState.value!
+            .where((expense) => expense.id != expenseId)
+            .toList(growable: false),
+      );
+    }
 
     try {
-      await repo.updateExpense(
+      await repo.deleteExpense(
         groupId: arg,
         expenseId: expenseId,
         userId: userId,
-        description: description,
-        amount: amount,
-        payerId: payerId,
-        category: category,
-        date: date,
-        splits: splits,
-        payments: payments,
       );
-      // Refetch to get consistent state
-      state = await AsyncValue.guard(() => repo.getExpenses(arg));
-    } catch (e) {
-      // state = previousState; // If we didn't optimistic update, no need to revert, but we are reloading
-      state = AsyncValue.error(e, StackTrace.current);
+    } catch (error) {
+      state = previousState;
       rethrow;
     }
   }
 
-  Future<void> deleteExpense(int expenseId, int userId) async {
-    final repo = ref.read(expensesRepositoryProvider);
-    final previousState = state;
-
-    // Optimistic Update
-    if (previousState.value != null) {
-      state = AsyncValue.data(
-        previousState.value!.where((e) => e.id != expenseId).toList(),
-      );
+  String _memberName(String memberId) {
+    final members = ref.read(groupMembersProvider(arg)).value;
+    if (members == null) return '';
+    for (final member in members) {
+      if (member.id == memberId) return member.name;
     }
-
-    try {
-      await repo.deleteExpense(expenseId, userId);
-    } catch (e) {
-      state = previousState;
-      rethrow;
-    }
+    return '';
   }
 }

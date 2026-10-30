@@ -1,0 +1,232 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function groupRef(groupId) {
+      return /databases/$(database)/documents/groups/$(groupId);
+    }
+
+    function groupData(groupId) {
+      return get(groupRef(groupId)).data;
+    }
+
+    function groupExists(groupId) {
+      return exists(groupRef(groupId));
+    }
+
+    function isGroupMember(groupId) {
+      return signedIn() && uid() in groupData(groupId).get('memberUids', []);
+    }
+
+    function isGroupOwner(groupId) {
+      return signedIn() && groupData(groupId).get('ownerUid', '') == uid();
+    }
+
+    function isPremium() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(uid()))
+        && get(/databases/$(database)/documents/users/$(uid())).data.get('isPremium', false) == true;
+    }
+
+    function nonEmptyString(value) {
+      return value is string && value.size() > 0;
+    }
+
+    function validExpense(data) {
+      return data.amount is number
+        && data.amount > 0
+        && nonEmptyString(data.description)
+        && data.splits is list
+        && data.splits.size() > 0
+        && data.memberIds is list
+        && data.memberIds.size() > 0
+        && nonEmptyString(data.payerId)
+        && data.payerId in data.memberIds
+        && data.date is timestamp
+        && data.isSettlement is bool
+        && data.category is string;
+    }
+
+    // ---------------------------------------------------------------------
+    // users/{uid}
+    // ---------------------------------------------------------------------
+
+    match /users/{userId} {
+      function isSelf() {
+        return signedIn() && uid() == userId;
+      }
+
+      function privilegedFieldsUntouched() {
+        return !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['isPremium', 'premiumUntil']);
+      }
+
+      allow read: if isSelf();
+
+      allow create: if isSelf()
+        && request.resource.data.uid == userId
+        && (!('isPremium' in request.resource.data) || request.resource.data.isPremium == false)
+        && (!('premiumUntil' in request.resource.data) || request.resource.data.premiumUntil == null);
+
+      allow update: if isSelf()
+        && privilegedFieldsUntouched()
+        && request.resource.data.uid == userId;
+
+      allow delete: if isSelf();
+
+      match /devices/{deviceId} {
+        allow read, write: if isSelf();
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // groups/{groupId}
+    // ---------------------------------------------------------------------
+
+    match /groups/{groupId} {
+      allow read: if signedIn() && uid() in resource.data.get('memberUids', []);
+
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == uid()
+        && uid() in request.resource.data.memberUids
+        && request.resource.data.memberUids.size() > 0
+        && nonEmptyString(request.resource.data.name)
+        && request.resource.data.type in ['REGULAR', 'PERSONAL'];
+
+      allow update: if isGroupOwner(groupId)
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.type == resource.data.type
+        && request.resource.data.memberUids == resource.data.memberUids
+        && request.resource.data.createdAt == resource.data.createdAt;
+
+      // Deletion goes through the `deleteGroup` callable so subcollections are
+      // removed as well. Client deletes would orphan expenses and members.
+      allow delete: if false;
+
+      match /members/{memberId} {
+        allow read: if isGroupMember(groupId);
+
+        // The owner writes their own member document in the same batch as the
+        // group document, so `get()` on the parent group would not see it yet.
+        allow create: if signedIn()
+          && request.resource.data.isRemoved == false
+          && (
+            (
+              isGroupMember(groupId)
+              && request.resource.data.get('uid', null) == null
+              && request.resource.data.isAdmin == false
+            )
+            || (
+              memberId == uid()
+              && request.resource.data.uid == uid()
+              && request.resource.data.isAdmin == true
+            )
+          );
+
+        allow update: if signedIn()
+          && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['isRemoved'])
+          && (
+            (
+              resource.data.get('uid', null) == uid()
+              && resource.data.isRemoved == false
+              && request.resource.data.uid == resource.data.uid
+              && request.resource.data.isAdmin == resource.data.isAdmin
+            )
+            || isGroupOwner(groupId)
+          );
+
+        // Members are never hard-deleted; `removeMember` marks them removed.
+        allow delete: if false;
+      }
+
+      match /expenses/{expenseId} {
+        allow read: if isGroupMember(groupId);
+
+        allow create: if isGroupMember(groupId)
+          && validExpense(request.resource.data)
+          && request.resource.data.createdBy == uid();
+
+        allow update: if isGroupMember(groupId)
+          && validExpense(request.resource.data)
+          && (
+            resource.data.createdBy == uid()
+            || isGroupOwner(groupId)
+          );
+
+        allow delete: if isGroupMember(groupId)
+          && (
+            resource.data.createdBy == uid()
+            || isGroupOwner(groupId)
+          );
+      }
+
+      match /categories/{categoryId} {
+        allow read: if isGroupMember(groupId);
+
+        allow create: if isGroupMember(groupId)
+          && isPremium()
+          && nonEmptyString(request.resource.data.name);
+
+        allow update: if isGroupOwner(groupId)
+          && nonEmptyString(request.resource.data.name);
+
+        allow delete: if isGroupOwner(groupId);
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // invites/{token} — callables only
+    // ---------------------------------------------------------------------
+
+    match /invites/{token} {
+      allow read, write: if false;
+    }
+
+    // reminders/{id} — written by Cloud Functions only
+    match /reminders/{reminderId} {
+      allow read, write: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // cashInflows/{inflowId}
+    // ---------------------------------------------------------------------
+
+    match /cashInflows/{inflowId} {
+      allow read: if signedIn() && resource.data.uid == uid();
+
+      allow create: if signedIn()
+        && request.resource.data.uid == uid()
+        && request.resource.data.amount is number
+        && request.resource.data.amount > 0
+        && nonEmptyString(request.resource.data.description)
+        && request.resource.data.date is timestamp;
+
+      allow update: if signedIn()
+        && resource.data.uid == uid()
+        && request.resource.data.uid == uid()
+        && request.resource.data.amount is number
+        && request.resource.data.amount > 0;
+
+      allow delete: if signedIn() && resource.data.uid == uid();
+    }
+
+    // Default deny for everything else.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

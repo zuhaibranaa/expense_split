@@ -1,14 +1,19 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../../../core/firebase/firestore_converters.dart';
+
 class CashInflow {
-  final int id;
-  final int userId;
+  final String id;
+  final String userId;
   final double amount;
   final String currencyCode;
   final String category;
   final String description;
   final DateTime date;
-  final int? expenseId;
+  final String? expenseId;
+  final DateTime? createdAt;
 
-  CashInflow({
+  const CashInflow({
     required this.id,
     required this.userId,
     required this.amount,
@@ -17,31 +22,36 @@ class CashInflow {
     required this.description,
     required this.date,
     this.expenseId,
+    this.createdAt,
   });
 
-  factory CashInflow.fromJson(Map<String, dynamic> json) {
+  factory CashInflow.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    return CashInflow.fromMap(doc.id, doc.data() ?? const {});
+  }
+
+  factory CashInflow.fromMap(String id, Map<String, dynamic> map) {
     return CashInflow(
-      id: json['id'],
-      userId: json['user_id'],
-      amount: (json['amount'] ?? 0).toDouble(),
-      currencyCode: json['currency_code'] ?? 'USD',
-      category: json['category'] ?? 'Income',
-      description: json['description'] ?? '',
-      date: DateTime.parse(json['date']),
-      expenseId: json['expense_id'],
+      id: id,
+      userId: asString(map['uid']),
+      amount: asDouble(map['amount']),
+      currencyCode: asString(map['currencyCode'], 'USD'),
+      category: asString(map['category'], 'Income'),
+      description: asString(map['description']),
+      date: timestampToDateOrNow(map['date']),
+      expenseId: asStringOrNull(map['expenseId']),
+      createdAt: timestampToDate(map['createdAt']),
     );
   }
 
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toMap() {
     return {
-      'id': id,
-      'user_id': userId,
-      'amount': amount,
-      'currency_code': currencyCode,
+      'uid': userId,
+      'amount': roundMoney(amount),
+      'currencyCode': currencyCode,
       'category': category,
       'description': description,
-      'date': date.toIso8601String(),
-      'expense_id': expenseId,
+      'date': dateToTimestamp(date),
+      'expenseId': expenseId,
     };
   }
 }

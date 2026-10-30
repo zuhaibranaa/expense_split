@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "equisplit-d4c74",
+    "staging": "equisplit-d4c74",
+    "prod": "equisplit-d4c74"
+  }
+}

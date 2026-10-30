@@ -10,7 +10,7 @@ import 'member_profile_screen.dart';
 import 'package:equisplit/src/shared/presentation/widgets/user_avatar.dart';
 
 class MembersListView extends ConsumerWidget {
-  final int groupId;
+  final String groupId;
 
   const MembersListView({super.key, required this.groupId});
 
@@ -49,16 +49,11 @@ class MembersListView extends ConsumerWidget {
           // Fallback to basic user check if needed.
           final currentMember = members.firstWhere(
             (m) => m.userId == currentUser?.id,
-            orElse: () => Member(
-              id: -1,
-              groupId: groupId,
-              name: '',
-              userId: null,
-              isAdmin: 0,
-            ),
+            orElse: () =>
+                Member(id: '', groupId: groupId, name: '', userId: null),
           );
 
-          final isSuperAdmin = currentMember.isAdmin == 1;
+          final isSuperAdmin = currentMember.isAdmin;
 
           return RefreshIndicator(
             onRefresh: () async {
@@ -128,7 +123,7 @@ class MembersListView extends ConsumerWidget {
       title: Text(member.name),
       subtitle: Row(
         children: [
-          if (member.isAdmin == 1)
+          if (member.isAdmin)
             Container(
               margin: const EdgeInsets.only(right: 8),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -428,7 +423,7 @@ class MembersListView extends ConsumerWidget {
 }
 
 class AddMemberDialog extends ConsumerStatefulWidget {
-  final int groupId;
+  final String groupId;
 
   const AddMemberDialog({super.key, required this.groupId});
 

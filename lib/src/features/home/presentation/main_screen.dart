@@ -8,6 +8,7 @@ import '../../analytics/presentation/global_settlements_screen.dart';
 import '../../groups/data/groups_repository.dart';
 
 import '../../auth/data/auth_repository.dart';
+import '../../expenses/presentation/expenses_providers.dart';
 
 class MainScreen extends ConsumerWidget {
   const MainScreen({super.key});
@@ -15,16 +16,14 @@ class MainScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final groupsAsync = ref.watch(groupsListProvider);
+    // Resolve from `users/{uid}.personalGroupId` instead of guessing which
+    // group in the list is personal.
+    final personalGroup = ref.watch(personalGroupProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('EquiSplit'), centerTitle: true),
       body: groupsAsync.when(
-        data: (groups) {
-          final personalGroup = groups.cast<dynamic>().firstWhere(
-            (g) => g.type == 'PERSONAL',
-            orElse: () => null,
-          );
-
+        data: (_) {
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(

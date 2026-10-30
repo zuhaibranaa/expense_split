@@ -8,7 +8,7 @@ import 'month_picker_dialog.dart';
 import 'user_filter_list.dart';
 
 class FilterModal extends ConsumerWidget {
-  final int groupId;
+  final String groupId;
   final bool showDateFilter;
   final bool showSimplifyDebts;
   final bool showMemberFilter;

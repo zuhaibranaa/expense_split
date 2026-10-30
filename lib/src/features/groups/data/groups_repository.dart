@@ -1,128 +1,247 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../domain/group_model.dart';
-import '../../people/domain/member_model.dart';
-import '../../../shared/data/api_client.dart';
+
+import '../../../core/constants/default_categories.dart';
+import '../../../core/firebase/firestore_refs.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../people/domain/member_model.dart';
+import '../domain/group_model.dart';
 
 class GroupsRepository {
-  final ApiClient _api;
+  GroupsRepository(this._refs, this._functions, this._auth);
 
-  GroupsRepository(this._api);
+  final FirestoreRefs _refs;
+  final FirebaseFunctions _functions;
+  final FirebaseAuth _auth;
 
-  Future<void> createGroup(
-    String name,
-    String currency,
-    int creatorUserId,
-  ) async {
-    await _api.post('/groups/', {
-      'name': name,
-      'currency': currency,
-      'creator_user_id': creatorUserId,
-    });
-    // Optimistic update or refresh handled by Stream/Future provider usually
-    // For now, we rely on refetching.
+  String get _uid {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      throw StateError('You must be signed in to do that.');
+    }
+    return uid;
   }
 
-  Future<List<Group>> getGroups(int? userId) async {
-    final List<dynamic> json = await _api.get(
-      '/groups/${userId != null ? "?user_id=$userId" : ""}',
-    );
-    return json.map((e) => Group.fromJson(e)).toList();
+  /// Creates a regular group plus its owner member document.
+  /// Default categories are seeded by the `onGroupCreated` Cloud Function so
+  /// non-premium users do not need category-write permission.
+  Future<String> createGroup(
+    String name,
+    String currency,
+    String creatorUserId, {
+    String creatorName = '',
+  }) async {
+    final cleanName = name.trim();
+    if (cleanName.isEmpty) {
+      throw ArgumentError('Group name cannot be empty.');
+    }
+    await _assertUniqueName(cleanName);
+
+    final groupRef = _refs.groups.doc();
+    final batch = _refs.db.batch();
+
+    batch.set(groupRef, {
+      'name': cleanName,
+      'currency': currency,
+      'type': 'REGULAR',
+      'ownerUid': creatorUserId,
+      'memberUids': [creatorUserId],
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+      'lastActivityAt': FieldValue.serverTimestamp(),
+    });
+
+    batch.set(_refs.members(groupRef.id).doc(creatorUserId), {
+      'name': creatorName.trim().isEmpty ? 'Owner' : creatorName.trim(),
+      'uid': creatorUserId,
+      'isAdmin': true,
+      'isRemoved': false,
+      'email': _auth.currentUser?.email,
+      'avatarUrl': _auth.currentUser?.photoURL,
+      'hasFcmToken': false,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
+    return groupRef.id;
+  }
+
+  Future<void> _assertUniqueName(String name) async {
+    final existing = await _refs.groups
+        .where('memberUids', arrayContains: _uid)
+        .where('name', isEqualTo: name)
+        .limit(1)
+        .get();
+    if (existing.docs.isNotEmpty) {
+      throw StateError('You already have a group named "$name".');
+    }
+  }
+
+  Stream<List<Group>> watchGroups(String userId) {
+    return _refs.groups
+        .where('memberUids', arrayContains: userId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map(
+          (snapshot) =>
+              snapshot.docs.map(Group.fromDoc).toList(growable: false),
+        );
+  }
+
+  Future<List<Group>> getGroups(String? userId) async {
+    if (userId == null) return const [];
+    final snapshot = await _refs.groups
+        .where('memberUids', arrayContains: userId)
+        .orderBy('createdAt', descending: true)
+        .get();
+    return snapshot.docs.map(Group.fromDoc).toList(growable: false);
   }
 
   Future<void> updateGroup(
-    int groupId,
-    int userId, {
+    String groupId,
+    String userId, {
     String? name,
     String? currency,
   }) async {
-    await _api.put('/groups/$groupId?user_id=$userId', {
-      if (name != null) 'name': name,
-      if (currency != null) 'currency': currency,
+    if (name != null && name.trim().isNotEmpty) {
+      await _assertUniqueName(name.trim());
+    }
+    await _refs.group(groupId).update({
+      if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+      'currency': ?currency,
+      'updatedAt': FieldValue.serverTimestamp(),
     });
   }
 
-  Future<void> deleteGroup(int groupId, int userId) async {
-    await _api.delete('/groups/$groupId?user_id=$userId');
+  Future<void> deleteGroup(String groupId, String userId) async {
+    await _call('deleteGroup', {'groupId': groupId});
   }
 
-  Future<String> generateInvite(int groupId, int memberId, int userId) async {
-    final response = await _api.post(
-      '/members/$memberId/invite?user_id=$userId',
-      {},
+  Future<String> generateInvite(
+    String groupId,
+    String memberId,
+    String userId,
+  ) async {
+    final result = await _call('createInvite', {
+      'groupId': groupId,
+      'memberId': memberId,
+    });
+    final token = result.data is Map ? result.data['token'] : null;
+    if (token is! String || token.isEmpty) {
+      throw StateError('Could not create an invite link. Please try again.');
+    }
+    return token;
+  }
+
+  Future<Map<String, dynamic>> claimInvite(String token, String userId) async {
+    final result = await _call('claimInvite', {'token': token});
+    final data = result.data;
+    return data is Map
+        ? data.map((key, value) => MapEntry(key.toString(), value))
+        : <String, dynamic>{};
+  }
+
+  Stream<List<Member>> watchMembers(
+    String groupId, {
+    bool includeDeleted = false,
+  }) {
+    Query<Map<String, dynamic>> query = _refs.members(groupId);
+    if (!includeDeleted) {
+      query = query.where('isRemoved', isEqualTo: false);
+    }
+    return query.snapshots().map(
+      (snapshot) => snapshot.docs
+          .map((doc) => Member.fromDoc(groupId, doc))
+          .toList(growable: false),
     );
-    return response['token'];
-  }
-
-  Future<Map<String, dynamic>> claimInvite(String token, int userId) async {
-    final response = await _api.post('/invites/claim?user_id=$userId', {
-      'token': token,
-    });
-    return response;
   }
 
   Future<List<Member>> getMembers(
-    int groupId, {
+    String groupId, {
     bool includeDeleted = false,
   }) async {
-    final query = includeDeleted ? '?include_deleted=true' : '';
-    final List<dynamic> json = await _api.get(
-      '/groups/$groupId/members/$query',
-    );
-    return json.map((e) => Member.fromJson(e)).toList();
+    Query<Map<String, dynamic>> query = _refs.members(groupId);
+    if (!includeDeleted) {
+      query = query.where('isRemoved', isEqualTo: false);
+    }
+    final snapshot = await query.get();
+    return snapshot.docs
+        .map((doc) => Member.fromDoc(groupId, doc))
+        .toList(growable: false);
   }
 
+  /// Client-side replacement for the old reset job. Deletes every personal
+  /// inflow and personal-group expense for the signed-in user.
   Future<void> resetPersonalBalance() async {
-    await _api.post('/personal-group/reset-balance', {});
+    await _call('resetPersonalBalance', const {});
   }
 
-  Future<void> syncPersonalFromExpenses({
-    required String startDate,
-    required String endDate,
-  }) async {
-    await _api.post('/personal-group/sync', {
-      'start_date': startDate,
-      'end_date': endDate,
-    });
+  /// Returns the default categories used when creating a group.
+  static List<DefaultCategory> get defaults => kDefaultCategories;
+
+  Future<HttpsCallableResult<dynamic>> _call(
+    String name,
+    Map<String, dynamic> payload,
+  ) {
+    return _functions.httpsCallable(name).call<dynamic>(payload);
   }
 }
 
-// Re-using the same provider name, but changing type to FutureProvider for simplicity with HTTP,
-// or StreamProvider if we poll/socket. Let's start with FutureProvider/polling.
-// Actually, UI expects Stream, so we can yield results periodically or just Stream.fromFuture.
 final groupsRepositoryProvider = Provider<GroupsRepository>((ref) {
-  final api = ref.watch(apiClientProvider);
-  return GroupsRepository(api);
+  return GroupsRepository(
+    ref.watch(firestoreRefsProvider),
+    ref.watch(firebaseFunctionsProvider),
+    ref.watch(firebaseAuthProvider),
+  );
 });
 
+/// Real-time group list for the signed-in user.
+/// Stays an [AsyncNotifier] because screens call `.notifier` for mutations.
 final groupsListProvider =
     AsyncNotifierProvider.autoDispose<GroupsNotifier, List<Group>>(
       GroupsNotifier.new,
     );
 
 class GroupsNotifier extends AutoDisposeAsyncNotifier<List<Group>> {
+  StreamSubscription<List<Group>>? _subscription;
+
   @override
   Future<List<Group>> build() async {
-    final repo = ref.watch(groupsRepositoryProvider);
     final user = ref.watch(authControllerProvider).value;
-    if (user == null) return [];
-    return repo.getGroups(user.id);
+    if (user == null) return const [];
+
+    ref.onDispose(() => _subscription?.cancel());
+
+    final repo = ref.watch(groupsRepositoryProvider);
+    final stream = repo.watchGroups(user.id);
+    final first = Completer<List<Group>>();
+    _subscription = stream.listen(
+      (groups) {
+        if (!first.isCompleted) first.complete(groups);
+        state = AsyncValue.data(groups);
+      },
+      onError: (Object error, StackTrace stack) {
+        if (!first.isCompleted) first.completeError(error, stack);
+        state = AsyncValue.error(error, stack);
+      },
+    );
+
+    return first.future;
   }
 
   Future<void> addGroup(String name, String currency) async {
     final user = ref.read(authControllerProvider).value;
     if (user == null) return;
     final repo = ref.read(groupsRepositoryProvider);
-
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      await repo.createGroup(name, currency, user.id);
-      return repo.getGroups(user.id); // Refetch to get ID and server fields
-    });
+    await repo.createGroup(name, currency, user.id, creatorName: user.name);
   }
 
   Future<void> updateGroup(
-    int groupId, {
+    String groupId, {
     String? name,
     String? currency,
   }) async {
@@ -130,69 +249,59 @@ class GroupsNotifier extends AutoDisposeAsyncNotifier<List<Group>> {
     if (user == null) return;
     final repo = ref.read(groupsRepositoryProvider);
 
-    // Optimistic Update
     final previousState = state;
     if (previousState.value != null) {
       state = AsyncValue.data(
-        previousState.value!.map((g) {
-          if (g.id == groupId) {
-            return Group(
-              id: g.id,
-              name: name ?? g.name,
-              currency: currency ?? g.currency,
-              createdAt: g.createdAt,
-              type: g.type,
-              // creatorUserId: g.creatorUserId, // Removed as it's not in model or needed for optimistic
-            );
-          }
-          return g;
-        }).toList(),
+        previousState.value!
+            .map(
+              (group) => group.id == groupId
+                  ? group.copyWith(name: name, currency: currency)
+                  : group,
+            )
+            .toList(growable: false),
       );
     }
 
     try {
       await repo.updateGroup(groupId, user.id, name: name, currency: currency);
-    } catch (e) {
-      // Revert on failure
+    } catch (error) {
       state = previousState;
       rethrow;
     }
   }
 
-  Future<void> deleteGroup(int groupId) async {
+  Future<void> deleteGroup(String groupId) async {
     final user = ref.read(authControllerProvider).value;
     if (user == null) return;
     final repo = ref.read(groupsRepositoryProvider);
 
-    // Optimistic Update
     final previousState = state;
     if (previousState.value != null) {
       state = AsyncValue.data(
-        previousState.value!.where((g) => g.id != groupId).toList(),
+        previousState.value!
+            .where((group) => group.id != groupId)
+            .toList(growable: false),
       );
     }
 
     try {
       await repo.deleteGroup(groupId, user.id);
-    } catch (e) {
+    } catch (error) {
       state = previousState;
       rethrow;
     }
   }
 }
 
-final groupMembersProvider = FutureProvider.family<List<Member>, int>((
-  ref,
-  groupId,
-) async {
-  final repo = ref.watch(groupsRepositoryProvider);
-  return repo.getMembers(groupId);
-});
+final groupMembersProvider = StreamProvider.autoDispose
+    .family<List<Member>, String>((ref, groupId) {
+      return ref.watch(groupsRepositoryProvider).watchMembers(groupId);
+    });
 
-final allMembersFutureProvider = FutureProvider.family<List<Member>, int>((
-  ref,
-  groupId,
-) async {
-  final repo = ref.watch(groupsRepositoryProvider);
-  return repo.getMembers(groupId, includeDeleted: true);
-});
+/// Includes removed members so historical expenses can still resolve names.
+final allMembersFutureProvider = StreamProvider.autoDispose
+    .family<List<Member>, String>((ref, groupId) {
+      return ref
+          .watch(groupsRepositoryProvider)
+          .watchMembers(groupId, includeDeleted: true);
+    });

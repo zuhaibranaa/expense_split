@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -8,38 +10,58 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   String? _fcmToken;
+  final Completer<String> _registration = Completer<String>();
   static const String _vapidKey =
       'BHFYMw81dqq6kMHJuhv7A4E9_wcx_gFAMu-UpeLS9-grGliRMNbChXeROniX6aZPOn9x8AGHXQs52PugaU5jlMw';
 
   Future<void> init() async {
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+    // Local notifications are not supported on Windows; Firebase Messaging is
+    // only available on Android, iOS and Web. Everything here is best-effort so
+    // a desktop launch never crashes on notification setup.
+    try {
+      const AndroidInitializationSettings initializationSettingsAndroid =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    const DarwinInitializationSettings initializationSettingsIOS =
-        DarwinInitializationSettings(
-          requestAlertPermission: true,
-          requestBadgePermission: true,
-          requestSoundPermission: true,
-        );
+      const DarwinInitializationSettings initializationSettingsIOS =
+          DarwinInitializationSettings(
+            requestAlertPermission: true,
+            requestBadgePermission: true,
+            requestSoundPermission: true,
+          );
 
-    const InitializationSettings initializationSettings =
-        InitializationSettings(
-          android: initializationSettingsAndroid,
-          iOS: initializationSettingsIOS,
-        );
+      const InitializationSettings initializationSettings =
+          InitializationSettings(
+            android: initializationSettingsAndroid,
+            iOS: initializationSettingsIOS,
+            macOS: initializationSettingsIOS,
+          );
 
-    await _notificationsPlugin.initialize(
-      initializationSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        // Handle notification tap
-      },
-    );
+      await _notificationsPlugin.initialize(
+        initializationSettings,
+        onDidReceiveNotificationResponse: (NotificationResponse response) {
+          // Handle notification tap
+        },
+      );
+    } catch (error) {
+      debugPrint('Local notifications unavailable: $error');
+    }
 
-    // Initialize Firebase Messaging (Fire and forget, don't block startup)
+    // Initialize Firebase Messaging (fire and forget, don't block startup)
     _initFirebaseMessaging();
   }
 
+  bool get _supportsMessaging {
+    if (kIsWeb) return true;
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+  }
+
   Future<void> _initFirebaseMessaging() async {
+    if (!_supportsMessaging) {
+      debugPrint('Firebase Messaging is not supported on this platform.');
+      return;
+    }
+
     try {
       final messaging = FirebaseMessaging.instance;
 
@@ -54,44 +76,40 @@ class NotificationService {
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
         debugPrint('User granted permission');
 
-        // Get Token
-        if (kIsWeb) {
-          _fcmToken = await messaging.getToken(vapidKey: _vapidKey);
-        } else {
-          if (defaultTargetPlatform == TargetPlatform.iOS) {
-            String? apnsToken = await messaging.getAPNSToken();
+        // FID registrations arrive on this stream. Keep listening so refreshes
+        // are picked up after the first registration.
+        messaging.onRegistered.listen((registrationId) {
+          _fcmToken = registrationId;
+          if (!_registration.isCompleted) {
+            _registration.complete(registrationId);
+          }
+          debugPrint('FCM registration id: $registrationId');
+        });
 
-            // Retry checking for APNS token
-            if (apnsToken == null) {
-              debugPrint('APNS token not available yet, polling...');
-              for (int i = 0; i < 5; i++) {
-                await Future.delayed(const Duration(seconds: 2));
-                apnsToken = await messaging.getAPNSToken();
-                if (apnsToken != null) {
-                  debugPrint('APNS token found after retry ${i + 1}');
-                  break;
-                }
+        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+          String? apnsToken = await messaging.getAPNSToken();
+
+          // Retry checking for APNS token
+          if (apnsToken == null) {
+            debugPrint('APNS token not available yet, polling...');
+            for (int i = 0; i < 5; i++) {
+              await Future.delayed(const Duration(seconds: 2));
+              apnsToken = await messaging.getAPNSToken();
+              if (apnsToken != null) {
+                debugPrint('APNS token found after retry ${i + 1}');
+                break;
               }
             }
+          }
 
-            if (apnsToken != null) {
-              _fcmToken = await messaging.getToken();
-            } else {
-              debugPrint(
-                'APNS token still null after retries. FCM token fetch will likely fail.',
-              );
-              // Try anyway, sometimes getToken handles it internally or it's a simulator issue
-              try {
-                _fcmToken = await messaging.getToken();
-              } catch (e) {
-                debugPrint('Failed to get FCM token without APNS token: $e');
-              }
-            }
-          } else {
-            _fcmToken = await messaging.getToken();
+          if (apnsToken == null) {
+            debugPrint(
+              'APNS token still null after retries. FCM registration will likely fail.',
+            );
           }
         }
-        debugPrint('FCM Token: $_fcmToken');
+
+        await messaging.register(vapidKey: kIsWeb ? _vapidKey : null);
 
         // Handle Foreground Messages
         FirebaseMessaging.onMessage.listen((RemoteMessage message) {
@@ -117,11 +135,21 @@ class NotificationService {
   }
 
   Future<String?> getFcmToken() async {
-    if (kIsWeb) {
-      return _fcmToken ??
-          await FirebaseMessaging.instance.getToken(vapidKey: _vapidKey);
+    if (!_supportsMessaging) return null;
+    if (_fcmToken != null) return _fcmToken;
+
+    try {
+      await FirebaseMessaging.instance.register(
+        vapidKey: kIsWeb ? _vapidKey : null,
+      );
+      return await _registration.future.timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => _fcmToken ?? '',
+      );
+    } catch (e) {
+      debugPrint('Failed to register for FCM: $e');
+      return _fcmToken;
     }
-    return _fcmToken ?? await FirebaseMessaging.instance.getToken();
   }
 
   Future<void> showNotification({
@@ -155,6 +183,8 @@ class NotificationService {
   }
 
   Future<void> requestPermissions() async {
+    if (!_supportsMessaging) return;
+
     await _notificationsPlugin
         .resolvePlatformSpecificImplementation<
           IOSFlutterLocalNotificationsPlugin
