@@ -187,14 +187,16 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final plan in kPremiumPlans) ...[
-                  Expanded(child: _buildPlanCard(theme, plan, prices)),
-                  if (plan != kPremiumPlans.last) const SizedBox(width: 12),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final plan in kPremiumPlans) ...[
+                    Expanded(child: _buildPlanCard(theme, plan, prices)),
+                    if (plan != kPremiumPlans.last) const SizedBox(width: 12),
+                  ],
                 ],
-              ],
+              ),
             ),
             const SizedBox(height: 8),
             if (savings > 0)
