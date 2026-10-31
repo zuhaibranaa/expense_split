@@ -12,7 +12,7 @@ class CloudinaryConfig {
   const CloudinaryConfig._();
 
   /// Your Cloudinary cloud name (dashboard → top-left).
-  static const String cloudName = '';
+  static const String cloudName = 'dizy9vwqd';
 
   /// Name of the unsigned upload preset.
   static const String uploadPreset = 'equisplit_avatars';
