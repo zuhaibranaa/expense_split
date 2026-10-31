@@ -22,10 +22,6 @@ service cloud.firestore {
       return get(groupRef(groupId)).data;
     }
 
-    function groupExists(groupId) {
-      return exists(groupRef(groupId));
-    }
-
     function isGroupMember(groupId) {
       return signedIn() && uid() in groupData(groupId).get('memberUids', []);
     }
@@ -118,9 +114,9 @@ service cloud.firestore {
 
       // Owner/admin may update; members may append themselves (invite claim).
       allow update: if signedIn()
-        && request.resource.data.ownerUid == resource.data.ownerUid
-        && request.resource.data.type == resource.data.type
-        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.get('ownerUid', resource.data.ownerUid) == resource.data.ownerUid
+        && request.resource.data.get('type', resource.data.type) == resource.data.type
+        && request.resource.data.get('createdAt', resource.data.createdAt) == resource.data.createdAt
         && (
           isGroupOwner(groupId)
           || isGroupAdmin(groupId)
