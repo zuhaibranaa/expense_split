@@ -1,7 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -12,10 +13,9 @@ import '../../people/domain/member_model.dart';
 import '../domain/group_model.dart';
 
 class GroupsRepository {
-  GroupsRepository(this._refs, this._functions, this._auth);
+  GroupsRepository(this._refs, this._auth);
 
   final FirestoreRefs _refs;
-  final FirebaseFunctions _functions;
   final FirebaseAuth _auth;
 
   String get _uid {
@@ -34,6 +34,7 @@ class GroupsRepository {
     String currency,
     String creatorUserId, {
     String creatorName = '',
+    String type = 'REGULAR',
   }) async {
     final cleanName = name.trim();
     if (cleanName.isEmpty) {
@@ -47,7 +48,7 @@ class GroupsRepository {
     batch.set(groupRef, {
       'name': cleanName,
       'currency': currency,
-      'type': 'REGULAR',
+      'type': type,
       'ownerUid': creatorUserId,
       'memberUids': [creatorUserId],
       'createdAt': FieldValue.serverTimestamp(),
@@ -65,6 +66,17 @@ class GroupsRepository {
       'hasFcmToken': false,
       'createdAt': FieldValue.serverTimestamp(),
     });
+
+    // Seed the nine default categories client-side so groups work without
+    // the onGroupCreated Cloud Function (Spark mode, D43). Fixed ids +
+    // merge make this idempotent if the trigger also runs.
+    for (final category in kDefaultCategories) {
+      batch.set(_refs.categories(groupRef.id).doc(category.id), {
+        'name': category.name,
+        'icon': category.icon,
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
 
     await batch.commit();
     return groupRef.id;
@@ -105,6 +117,14 @@ class GroupsRepository {
       'hasFcmToken': false,
       'createdAt': FieldValue.serverTimestamp(),
     });
+
+    for (final category in kDefaultCategories) {
+      batch.set(_refs.categories(groupRef.id).doc(category.id), {
+        'name': category.name,
+        'icon': category.icon,
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
 
     await batch.commit();
     return groupRef.id;
@@ -167,7 +187,25 @@ class GroupsRepository {
   }
 
   Future<void> deleteGroup(String groupId, String userId) async {
-    await _call('deleteGroup', {'groupId': groupId});
+    final groupSnap = await _refs.group(groupId).get();
+    if (!groupSnap.exists) throw StateError('Group not found.');
+    if (groupSnap.data()?['ownerUid'] != userId) {
+      throw StateError('Only the owner can delete this group.');
+    }
+    // Batch-delete every subcollection, then the group document.
+    for (final collection in const ['members', 'expenses', 'categories']) {
+      final snapshot = await _refs.db
+          .collection('groups/$groupId/$collection')
+          .get();
+      for (var i = 0; i < snapshot.docs.length; i += 400) {
+        final batch = _refs.db.batch();
+        for (final doc in snapshot.docs.skip(i).take(400)) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+      }
+    }
+    await _refs.group(groupId).delete();
   }
 
   Future<String> generateInvite(
@@ -175,23 +213,102 @@ class GroupsRepository {
     String memberId,
     String userId,
   ) async {
-    final result = await _call('createInvite', {
+    final groupSnap = await _refs.group(groupId).get();
+    if (!groupSnap.exists) throw StateError('Group not found.');
+    final memberUids = List<String>.from(
+      groupSnap.data()?['memberUids'] ?? const [],
+    );
+    if (!memberUids.contains(userId)) {
+      throw StateError('You are not a member of this group.');
+    }
+
+    final memberSnap = await _refs.members(groupId).doc(memberId).get();
+    if (!memberSnap.exists) throw StateError('Member not found.');
+    final memberData = memberSnap.data() ?? const <String, dynamic>{};
+    if (memberData['isRemoved'] == true) {
+      throw StateError('That person was removed from the group.');
+    }
+    final existingUid = memberData['uid'] as String?;
+    if (existingUid != null && existingUid.isNotEmpty) {
+      throw StateError('That person already has an account linked.');
+    }
+
+    final token = _generateToken();
+    await _refs.db.collection('invites').doc(token).set({
       'groupId': groupId,
       'memberId': memberId,
+      'createdBy': userId,
+      'createdAt': FieldValue.serverTimestamp(),
+      'expiresAt': Timestamp.fromDate(
+        DateTime.now().add(const Duration(days: 7)),
+      ),
+      'used': false,
     });
-    final token = result.data is Map ? result.data['token'] : null;
-    if (token is! String || token.isEmpty) {
-      throw StateError('Could not create an invite link. Please try again.');
-    }
     return token;
   }
 
   Future<Map<String, dynamic>> claimInvite(String token, String userId) async {
-    final result = await _call('claimInvite', {'token': token});
-    final data = result.data;
-    return data is Map
-        ? data.map((key, value) => MapEntry(key.toString(), value))
-        : <String, dynamic>{};
+    if (token.length < 32) throw StateError('Invalid invite code.');
+    final inviteRef = _refs.db.collection('invites').doc(token);
+    return _refs.db.runTransaction((tx) async {
+      final inviteSnap = await tx.get(inviteRef);
+      if (!inviteSnap.exists) throw StateError('Invite not found.');
+      final invite = inviteSnap.data()!;
+      if (invite['used'] == true) {
+        throw StateError('This invite has already been used.');
+      }
+      final expiresAt = (invite['expiresAt'] as Timestamp).toDate();
+      if (DateTime.now().isAfter(expiresAt)) {
+        throw StateError('This invite has expired.');
+      }
+      final groupId = invite['groupId'] as String;
+      final memberId = invite['memberId'] as String;
+
+      final groupRef = _refs.group(groupId);
+      final groupSnap = await tx.get(groupRef);
+      if (!groupSnap.exists) throw StateError('Group not found.');
+      final memberUids = List<String>.from(
+        groupSnap.data()?['memberUids'] ?? const [],
+      );
+      if (memberUids.contains(userId)) {
+        throw StateError('You are already a member of this group.');
+      }
+
+      final memberRef = _refs.members(groupId).doc(memberId);
+      final memberSnap = await tx.get(memberRef);
+      if (!memberSnap.exists) throw StateError('Member not found.');
+      final memberData = memberSnap.data() ?? const <String, dynamic>{};
+      final existingUid = memberData['uid'] as String?;
+      if (existingUid != null && existingUid.isNotEmpty) {
+        throw StateError('This member is already linked to an account.');
+      }
+
+      final userSnap = await tx.get(_refs.user(userId));
+      final userData = userSnap.data() ?? const <String, dynamic>{};
+      final name = (userData['name'] as String?)?.trim();
+      final email = userData['email'] as String?;
+      final avatarUrl = userData['avatarUrl'] as String?;
+
+      tx.update(inviteRef, {'used': true, 'claimedBy': userId});
+      tx.update(memberRef, {
+        'uid': userId,
+        'name': (name == null || name.isEmpty) ? 'Member' : name,
+        'email': email,
+        'avatarUrl': avatarUrl,
+        'hasFcmToken': false,
+      });
+      tx.update(groupRef, {
+        'memberUids': [...memberUids, userId],
+      });
+      tx.delete(inviteRef);
+      return {'groupId': groupId, 'memberId': memberId};
+    });
+  }
+
+  String _generateToken() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(32, (_) => random.nextInt(256));
+    return base64Url.encode(bytes).replaceAll('=', '');
   }
 
   Stream<List<Member>> watchMembers(
@@ -223,27 +340,45 @@ class GroupsRepository {
         .toList(growable: false);
   }
 
-  /// Client-side replacement for the old reset job. Deletes every personal
-  /// inflow and personal-group expense for the signed-in user.
+  /// Client-side replacement. Deletes every personal-group expense and the
+  /// signed-in user's cash inflows.
   Future<void> resetPersonalBalance() async {
-    await _call('resetPersonalBalance', const {});
+    final uid = _uid;
+    final userSnap = await _refs.user(uid).get();
+    final groupId = userSnap.data()?['personalGroupId'] as String?;
+    if (groupId == null || groupId.isEmpty) {
+      throw StateError('No personal group found.');
+    }
+    final expenseSnap = await _refs.db
+        .collection('groups/$groupId/expenses')
+        .get();
+    for (var i = 0; i < expenseSnap.docs.length; i += 400) {
+      final batch = _refs.db.batch();
+      for (final doc in expenseSnap.docs.skip(i).take(400)) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    }
+    final inflowSnap = await _refs.db
+        .collection('cashInflows')
+        .where('uid', isEqualTo: uid)
+        .get();
+    for (var i = 0; i < inflowSnap.docs.length; i += 400) {
+      final batch = _refs.db.batch();
+      for (final doc in inflowSnap.docs.skip(i).take(400)) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    }
   }
 
   /// Returns the default categories used when creating a group.
   static List<DefaultCategory> get defaults => kDefaultCategories;
-
-  Future<HttpsCallableResult<dynamic>> _call(
-    String name,
-    Map<String, dynamic> payload,
-  ) {
-    return _functions.httpsCallable(name).call<dynamic>(payload);
-  }
 }
 
 final groupsRepositoryProvider = Provider<GroupsRepository>((ref) {
   return GroupsRepository(
     ref.watch(firestoreRefsProvider),
-    ref.watch(firebaseFunctionsProvider),
     ref.watch(firebaseAuthProvider),
   );
 });

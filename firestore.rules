@@ -1,5 +1,4 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -35,6 +34,12 @@ service cloud.firestore {
       return signedIn() && groupData(groupId).get('ownerUid', '') == uid();
     }
 
+    function isGroupAdmin(groupId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/groups/$(groupId)/members/$(uid()))
+        && get(/databases/$(database)/documents/groups/$(groupId)/members/$(uid())).data.get('isAdmin', false) == true;
+    }
+
     function isPremium() {
       return signedIn()
         && exists(/databases/$(database)/documents/users/$(uid()))
@@ -43,6 +48,11 @@ service cloud.firestore {
 
     function nonEmptyString(value) {
       return value is string && value.size() > 0;
+    }
+
+    function isDefaultCategoryName(name) {
+      return name in ['General', 'Food & Drinks', 'Transportation',
+        'Entertainment', 'Shopping', 'Utilities', 'Housing', 'Life', 'Other'];
     }
 
     function validExpense(data) {
@@ -106,21 +116,27 @@ service cloud.firestore {
         && nonEmptyString(request.resource.data.name)
         && request.resource.data.type in ['REGULAR', 'PERSONAL'];
 
-      allow update: if isGroupOwner(groupId)
+      // Owner/admin may update; members may append themselves (invite claim).
+      allow update: if signedIn()
         && request.resource.data.ownerUid == resource.data.ownerUid
         && request.resource.data.type == resource.data.type
-        && request.resource.data.memberUids == resource.data.memberUids
-        && request.resource.data.createdAt == resource.data.createdAt;
+        && request.resource.data.createdAt == resource.data.createdAt
+        && (
+          isGroupOwner(groupId)
+          || isGroupAdmin(groupId)
+          || (
+            // Self-join via an invite claim: only memberUids gains this uid.
+            request.resource.data.memberUids == resource.data.get('memberUids', []).concat([uid()])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids', 'updatedAt', 'lastActivityAt'])
+          )
+        );
 
-      // Deletion goes through the `deleteGroup` callable so subcollections are
-      // removed as well. Client deletes would orphan expenses and members.
-      allow delete: if false;
+      // Owner (or admin) may delete; subcollections are removed client-side.
+      allow delete: if isGroupOwner(groupId) || isGroupAdmin(groupId);
 
       match /members/{memberId} {
         allow read: if isGroupMember(groupId);
 
-        // The owner writes their own member document in the same batch as the
-        // group document, so `get()` on the parent group would not see it yet.
         allow create: if signedIn()
           && request.resource.data.isRemoved == false
           && (
@@ -136,20 +152,27 @@ service cloud.firestore {
             )
           );
 
+        // Self-update (own member doc), self-claim (uid was null), or
+        // owner/admin (including setting isRemoved).
         allow update: if signedIn()
-          && !request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['isRemoved'])
           && (
             (
               resource.data.get('uid', null) == uid()
               && resource.data.isRemoved == false
-              && request.resource.data.uid == resource.data.uid
+              && request.resource.data.uid == resource.data.get('uid', null)
               && request.resource.data.isAdmin == resource.data.isAdmin
+              && !request.resource.data.diff(resource.data).affectedKeys()
+                   .hasAny(['isRemoved'])
+            )
+            || (
+              resource.data.get('uid', null) == null
+              && request.resource.data.uid == uid()
+              && resource.data.isRemoved == false
             )
             || isGroupOwner(groupId)
+            || isGroupAdmin(groupId)
           );
 
-        // Members are never hard-deleted; `removeMember` marks them removed.
         allow delete: if false;
       }
 
@@ -165,21 +188,25 @@ service cloud.firestore {
           && (
             resource.data.createdBy == uid()
             || isGroupOwner(groupId)
+            || isGroupAdmin(groupId)
           );
 
         allow delete: if isGroupMember(groupId)
           && (
             resource.data.createdBy == uid()
             || isGroupOwner(groupId)
+            || isGroupAdmin(groupId)
           );
       }
 
       match /categories/{categoryId} {
         allow read: if isGroupMember(groupId);
 
+        // Premium for custom categories; the nine defaults are seedable by
+        // any member (Spark-mode client seeding, D43).
         allow create: if isGroupMember(groupId)
-          && isPremium()
-          && nonEmptyString(request.resource.data.name);
+          && nonEmptyString(request.resource.data.name)
+          && (isPremium() || isDefaultCategoryName(request.resource.data.name));
 
         allow update: if isGroupOwner(groupId)
           && nonEmptyString(request.resource.data.name);
@@ -189,14 +216,40 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------------
-    // invites/{token} — callables only
+    // invites/{token} — capability tokens (D43 Spark mode)
     // ---------------------------------------------------------------------
+    // The document id is a 256-bit secret; any signed-in user may read a
+    // specific doc (enumeration is infeasible). Create is restricted to
+    // members of the referenced group.
 
     match /invites/{token} {
-      allow read, write: if false;
+      allow read: if signedIn() && token.size() >= 32;
+
+      allow create: if signedIn()
+        && token.size() >= 32
+        && nonEmptyString(request.resource.data.groupId)
+        && nonEmptyString(request.resource.data.memberId)
+        && request.resource.data.createdBy == uid()
+        && isGroupMember(request.resource.data.groupId)
+        && request.resource.data.used == false
+        && request.resource.data.expiresAt is timestamp;
+
+      // Claim: mark used + record claimer, only while unused & unexpired.
+      allow update: if signedIn()
+        && resource.data.used == false
+        && resource.data.expiresAt > request.time
+        && request.resource.data.used == true
+        && request.resource.data.claimedBy == uid()
+        && request.resource.data.groupId == resource.data.groupId
+        && request.resource.data.memberId == resource.data.memberId
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['used', 'claimedBy']);
+
+      allow delete: if signedIn()
+        && (resource.data.createdBy == uid() || isGroupOwner(resource.data.groupId));
     }
 
-    // reminders/{id} — written by Cloud Functions only
+    // reminders/{id} — written by Cloud Functions only (unused on Spark)
     match /reminders/{reminderId} {
       allow read, write: if false;
     }

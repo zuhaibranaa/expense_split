@@ -95,10 +95,36 @@ class MembersRepository {
     String memberId,
     String userId,
   ) async {
-    await _functions.httpsCallable('removeMember').call({
-      'groupId': groupId,
-      'memberId': memberId,
-    });
+    final groupSnap = await _refs.group(groupId).get();
+    if (!groupSnap.exists) throw StateError('Group not found.');
+    final groupData = groupSnap.data() ?? const <String, dynamic>{};
+    final ownerUid = groupData['ownerUid'] as String? ?? '';
+    final isAdmin = await _isGroupAdmin(groupId, userId);
+    if (ownerUid != userId && !isAdmin) {
+      throw StateError('Admin access required.');
+    }
+
+    final memberSnap = await _refs.members(groupId).doc(memberId).get();
+    if (!memberSnap.exists) throw StateError('Member not found.');
+    final memberUid = memberSnap.data()?['uid'] as String?;
+
+    final batch = _refs.db.batch();
+    batch.update(_refs.members(groupId).doc(memberId), {'isRemoved': true});
+    if (memberUid != null && memberUid.isNotEmpty) {
+      final memberUids = List<String>.from(groupData['memberUids'] ?? const [])
+        ..remove(memberUid);
+      batch.update(_refs.group(groupId), {'memberUids': memberUids});
+    }
+    await batch.commit();
+  }
+
+  Future<bool> _isGroupAdmin(String groupId, String userId) async {
+    try {
+      final snap = await _refs.members(groupId).doc(userId).get();
+      return snap.exists && snap.data()?['isAdmin'] == true;
+    } catch (_) {
+      return false;
+    }
   }
 }
 

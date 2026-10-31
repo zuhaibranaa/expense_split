@@ -303,6 +303,20 @@ The last unported backend features were the `IsAdminMiddleware`-guarded `send-to
 - `sendNotificationToUser({uid, title, body, data?})`, `sendNotificationToAllUsers({title, body, data?})`, `sendNotificationToTopic({topic, title, body, data?})`, reusing the shared `lib/fcm.ts` helpers (a new `sendPushToTopic` covers topics). `data` values are normalised to strings, as FCM requires.
 - Laravel's `users.is_admin` column becomes the `ADMIN_UIDS` Functions parameter (comma-separated uid list, set per environment). No admin UI is built — the Laravel endpoints were ops-only APIs, so callables are parity; admins invoke them with the client SDK or curl.
 
+### D43 — Spark-mode client-side port (no Cloud Functions / no Blaze)
+
+The project cannot be deployed to Blaze, so none of the Cloud Functions can run. The features they backed are re-implemented client-side against Firestore, with the security model relaxed to match:
+
+- **Invites** become capability tokens: the client generates a 32-byte base64url token, writes `invites/{token}`, and claims it in a client transaction. Rules allow any signed-in user to read a specific invite doc (the doc id *is* the secret — enumeration of a 256-bit space is infeasible) and to create one when they are a member of the referenced group. Claiming updates the invite (`used`), the placeholder member doc, and the group's `memberUids` in one transaction. Self-join without an invite is still possible by crafting writes, but group ids are unguessable auto-ids, so the residual risk is low; documented as a Spark-only tradeoff.
+- **Category seeding** moves to the client: `createGroup`/`createPersonalGroup` batch-write the nine default categories with their fixed ids (merge-safe, so a later `onGroupCreated` trigger cannot duplicate them). Rules allow creating a category without premium when its name is one of the nine defaults; custom categories stay premium-gated (D27).
+- **`removeMember`, `deleteGroup`, `resetPersonalBalance`** move to client batch writes. Group delete is allowed for the owner; member removal for owner/admin; `memberUids` may be edited by owner/admin.
+- **Member self-writes** are relaxed: a user may update their own member docs (name, avatarUrl, email, hasFcmToken, uid) across groups, so `syncMemberProfile`/`onDeviceRegistered` are no longer needed.
+- **Push notifications** (`onExpenseCreated`, reminders) cannot be sent without a server and are dropped on Spark. FCM token registration still works.
+- **Premium** is granted manually via the console/Admin SDK; `verifyPremiumPurchase` remains deployed-only.
+- **`cleanupInvites`/`onUserDelete`** are dropped; expired invites are rejected at claim time and account deletion leaves data behind.
+
+This is a security downgrade versus the Blaze design and is documented as Spark-only. Re-enabling Blaze + redeploying the functions restores the stronger model without code changes (the client writes remain valid because the rules still allow them).
+
 ---
 
 ## 3. Target Firestore schema
