@@ -274,6 +274,35 @@ Consequences of AGP 9's built-in Kotlin support, mirroring the current template:
 - `google-services` is bumped 4.3.15 → 4.5.0: 4.3.x hooks the removed legacy Variant API and breaks under AGP 9; 4.4+ uses `AndroidComponentsExtension`.
 - No functional, schema, or UI change; release signing and minify/shrink settings are untouched.
 
+### D40 — Personal group frontend resolution and self-heal
+
+The home-screen "Personal Expenses" card only rendered when `users/{uid}.personalGroupId` was set **and** that group was in `groupsListProvider`. Accounts whose `users/{uid}` document predates the deployed `bootstrapUser` trigger (or where the trigger failed) never saw the card, and nothing client-side could recover. The frontend now resolves and repairs instead of assuming:
+
+1. **Primary resolution is unchanged:** `users/{uid}.personalGroupId` (per §3.5).
+2. **Fallback:** if the pointer is missing or dangling, resolve the user's single `type == 'PERSONAL'` group with `ownerUid == uid` from the already-watched group list. This relaxes §3.5's "not by scanning the group list" — scanning is now the fallback only; the pointer stays authoritative once healed.
+3. **Backfill:** when the fallback resolves a group but the pointer is unset/mismatched, the client merges `personalGroupId` onto `users/{uid}` (self-write; rules only deny `isPremium`/`premiumUntil`).
+4. **Provisioning:** when no personal group exists at all, the client creates one through a batched write mirroring `bootstrapUser`'s payload (name `Personal`, `type: 'PERSONAL'`, owner member doc). Rules already permit member-created `PERSONAL` groups; `onGroupCreated` seeds categories as for any group, and `bootstrapUser` stays idempotent so a late trigger cannot double-create. Personal provisioning skips the duplicate-name check (a regular group may legitimately be called "Personal").
+
+Repair writes are attempted at most once per uid per app run (in-memory guard) so a failed write cannot loop; the stream providers converge once a write lands. Inflows stay user-scoped (unchanged); the premium gate on accessing the personal group is unchanged.
+
+### D41 — Premium pricing and Google Play Billing upgrade
+
+Premium was previously set manually in the Laravel database; there was never a purchase flow. Monetisation is now first-class:
+
+- **Plans:** two auto-renewing subscriptions in Google Play Console for `apk.equisplit.click` — `equisplit_premium_monthly` (US$2.99/month) and `equisplit_premium_yearly` (US$19.99/year, ~44% off, "Best value"), each with a 7-day free-trial offer.
+- **Benefits:** the personal expenses group (D40), custom categories (D27), and an ad-free experience (interstitials are already skipped for premium).
+- **Client:** `in_app_purchase` behind a new `features/premium/` slice — `PremiumPlan` domain model with store-price mapping, `PremiumRepository` (load products, buy, restore), and a full paywall `PricingScreen`. Every former "Upgrade screen coming soon!" dead end (home lock dialog, category management, custom-category gate, profile) opens it.
+- **Server:** callable `verifyPremiumPurchase({productId, purchaseToken})` validates the purchase with the Google Play Developer API (`purchases.subscriptionsv2`) using the `PLAY_SERVICE_ACCOUNT` secret (service-account JSON, Secret Manager), then writes `users/{uid}.isPremium` + `premiumUntil` with the Admin SDK — client writes to those keys stay denied (§9.11). Idempotent; expired subscriptions clear premium.
+- **Renewals/expiry are lazy:** the client re-verifies its active purchase on startup; real-time developer notifications (Pub/Sub → function) are future work. Play Billing is Android-only for now — web/desktop keep manual grants.
+- The Play Developer API cannot run in the Firebase emulator, so the callable has no emulator integration test; the plan/savings math and repository mapping are covered by Dart unit tests instead.
+
+### D42 — Admin notification senders (Laravel parity)
+
+The last unported backend features were the `IsAdminMiddleware`-guarded `send-to-user`, `send-to-all`, and `send-to-topic` endpoints. Firebase equivalents are three admin-gated callables in `functions/src/admin_notifications.ts`:
+
+- `sendNotificationToUser({uid, title, body, data?})`, `sendNotificationToAllUsers({title, body, data?})`, `sendNotificationToTopic({topic, title, body, data?})`, reusing the shared `lib/fcm.ts` helpers (a new `sendPushToTopic` covers topics). `data` values are normalised to strings, as FCM requires.
+- Laravel's `users.is_admin` column becomes the `ADMIN_UIDS` Functions parameter (comma-separated uid list, set per environment). No admin UI is built — the Laravel endpoints were ops-only APIs, so callables are parity; admins invoke them with the client SDK or curl.
+
 ---
 
 ## 3. Target Firestore schema

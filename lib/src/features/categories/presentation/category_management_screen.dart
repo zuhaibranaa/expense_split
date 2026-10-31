@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import '../../categories/data/categories_repository.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../premium/presentation/pricing_screen.dart';
 
 class CategoryManagementScreen extends ConsumerStatefulWidget {
   final String groupId;
@@ -187,9 +188,10 @@ class _CategoryManagementScreenState
                         const SizedBox(height: 16),
                         FilledButton.icon(
                           onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Upgrade screen coming soon!'),
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (ctx) => const PricingScreen(),
                               ),
                             );
                           },

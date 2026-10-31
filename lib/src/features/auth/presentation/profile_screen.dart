@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import 'package:image_picker/image_picker.dart';
 import 'package:equisplit/src/shared/presentation/widgets/user_avatar.dart';
+import 'package:equisplit/src/features/premium/presentation/pricing_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -128,6 +129,33 @@ class ProfileScreen extends ConsumerWidget {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () =>
                       _showChangePasswordDialog(context, ref, user.hasPassword),
+                ),
+
+                const SizedBox(height: 24),
+                _buildSectionHeader("Subscription"),
+
+                ListTile(
+                  leading: const Icon(Icons.workspace_premium),
+                  title: const Text('EquiSplit Premium'),
+                  subtitle: Text(
+                    user.isPremium
+                        ? user.premiumUntil == null
+                              ? 'Active'
+                              : 'Active until '
+                                    '${user.premiumUntil!.year}-'
+                                    '${user.premiumUntil!.month.toString().padLeft(2, '0')}-'
+                                    '${user.premiumUntil!.day.toString().padLeft(2, '0')}'
+                        : 'Personal group, custom categories, ad-free',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (ctx) => const PricingScreen(),
+                      ),
+                    );
+                  },
                 ),
 
                 const SizedBox(height: 24),

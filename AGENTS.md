@@ -524,6 +524,7 @@ Update this table as work lands. Keep it short; details belong in PRs.
 | 3.8 — Verification | Done | `flutter analyze` clean, 33 Dart tests, `flutter build web`, 36 rules tests, 8-step emulator golden path |
 | 4 — Parity QA | Not started | Needs real devices for push, avatar, offline |
 | 5 — Decommission | Not started | Archive Laravel (tag), don't delete history |
+| 6 — Premium & backend parity | Done | D41 pricing/Play Billing (`features/premium/`, `verifyPremiumPurchase`), D42 admin notification callables; 56 Dart tests; emulator integration tests for D42 pending a JDK 21 install |
 
 ---
 
