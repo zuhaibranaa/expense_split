@@ -32,6 +32,11 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- firebase_messaging 17 registers devices via Firebase Installation
+             IDs; the API is disabled unless this flag is set (AGENTS.md §9.13). -->
+        <meta-data
+            android:name="firebase_messaging_installation_id_enabled"
+            android:value="true" />
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-8338852725978624~8518510962"/>

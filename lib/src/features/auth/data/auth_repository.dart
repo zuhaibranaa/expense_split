@@ -392,7 +392,6 @@ class AuthRepository {
         'platform': _platformName,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-
     } catch (error) {
       debugPrint('Could not sync FCM token: $error');
     }
@@ -408,8 +407,6 @@ class AuthRepository {
       debugPrint('Could not remove FCM token: $error');
     }
   }
-
-
 
   String get _platformName {
     if (kIsWeb) return 'web';

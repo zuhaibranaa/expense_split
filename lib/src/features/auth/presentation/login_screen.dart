@@ -25,6 +25,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS;
   }
+
   final _nameController = TextEditingController();
   String _currency = 'USD';
   bool _obscurePassword = true;

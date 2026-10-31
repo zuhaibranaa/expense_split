@@ -9,6 +9,7 @@ import '../../groups/data/groups_repository.dart';
 
 import '../../auth/data/auth_repository.dart';
 import '../../expenses/presentation/expenses_providers.dart';
+import '../../premium/presentation/pricing_screen.dart';
 
 class MainScreen extends ConsumerWidget {
   const MainScreen({super.key});
@@ -19,6 +20,9 @@ class MainScreen extends ConsumerWidget {
     // Resolve from `users/{uid}.personalGroupId` instead of guessing which
     // group in the list is personal.
     final personalGroup = ref.watch(personalGroupProvider);
+    // Keeps the pointer backfilled / the personal group provisioned for
+    // accounts whose `bootstrapUser` trigger never ran (D40).
+    ref.watch(personalGroupRepairProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('EquiSplit'), centerTitle: true),
@@ -58,13 +62,11 @@ class MainScreen extends ConsumerWidget {
                                   FilledButton(
                                     onPressed: () {
                                       Navigator.pop(ctx);
-                                      ScaffoldMessenger.of(
+                                      Navigator.push(
                                         context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Upgrade screen coming soon!',
-                                          ),
+                                        MaterialPageRoute(
+                                          builder: (screenContext) =>
+                                              const PricingScreen(),
                                         ),
                                       );
                                     },

@@ -70,6 +70,55 @@ class GroupsRepository {
     return groupRef.id;
   }
 
+  /// Client-side provisioning of the personal group for accounts whose
+  /// `bootstrapUser` trigger never ran (D40). Mirrors the Cloud Function's
+  /// payload; `onGroupCreated` seeds the default categories as for any group.
+  /// Skips the duplicate-name check on purpose: a regular group may
+  /// legitimately be called "Personal".
+  Future<String> createPersonalGroup(
+    String uid, {
+    String name = 'Personal',
+    String? currency,
+    String creatorName = '',
+  }) async {
+    final groupRef = _refs.groups.doc();
+    final batch = _refs.db.batch();
+
+    batch.set(groupRef, {
+      'name': name,
+      'currency': currency ?? 'USD',
+      'type': 'PERSONAL',
+      'ownerUid': uid,
+      'memberUids': [uid],
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+      'lastActivityAt': FieldValue.serverTimestamp(),
+    });
+
+    batch.set(_refs.members(groupRef.id).doc(uid), {
+      'name': creatorName.trim().isEmpty ? 'Me' : creatorName.trim(),
+      'uid': uid,
+      'isAdmin': true,
+      'isRemoved': false,
+      'email': _auth.currentUser?.email,
+      'avatarUrl': _auth.currentUser?.photoURL,
+      'hasFcmToken': false,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
+    return groupRef.id;
+  }
+
+  /// Backfills `users/{uid}.personalGroupId` when the pointer is missing or
+  /// dangling (D40). Self-writes are allowed by the rules;
+  /// `isPremium`/`premiumUntil` stay Admin-SDK-only.
+  Future<void> setPersonalGroupId(String uid, String groupId) async {
+    await _refs.user(uid).set({
+      'personalGroupId': groupId,
+    }, SetOptions(merge: true));
+  }
+
   Future<void> _assertUniqueName(String name) async {
     final existing = await _refs.groups
         .where('memberUids', arrayContains: _uid)
