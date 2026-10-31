@@ -1,5 +1,4 @@
-# Release Notes — EquiSplit v1.1.0
-
+<en-US>
 • Real-time expense updates for all group members
 • Balance auto-refreshes when opening a group
 • Categories moved to Group Settings
@@ -8,3 +7,4 @@
 • Consistent password validation across sign-up and profile
 • OAuth users can set a password without entering a current one
 • Bug fixes and performance improvements
+</en-US>
