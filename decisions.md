@@ -317,6 +317,13 @@ The project cannot be deployed to Blaze, so none of the Cloud Functions can run.
 
 This is a security downgrade versus the Blaze design and is documented as Spark-only. Re-enabling Blaze + redeploying the functions restores the stronger model without code changes (the client writes remain valid because the rules still allow them).
 
+### D44 — Cloudinary avatars (Spark exception to rules 3 and 4)
+
+Firebase Storage requires the Blaze plan, which is unavailable. Avatars therefore use Cloudinary's free tier instead, reverting to the original Laravel approach (hard rule 4) and requiring HTTP multipart uploads (hard rule 3). This exception is **Spark-only**: on Blaze, revert to Firebase Storage (`avatars/{uid}/profile.jpg`) and delete this path.
+
+- Config: public client values `cloudName` + `uploadPreset` (an *unsigned* upload preset created in the Cloudinary dashboard). Stored in `lib/src/core/constants/cloudinary_config.dart`; empty defaults make the upload fail with a clear "configure Cloudinary" error instead of a cryptic network error.
+- `AuthRepository.uploadAvatar` POSTs the bytes to `https://api.cloudinary.com/v1_1/{cloud}/image/upload` as multipart, reads `secure_url` from the JSON response, and writes it to `users/{uid}.avatarUrl`. The existing HEAD-check in `profile_screen.dart` keeps working.
+
 ---
 
 ## 3. Target Firestore schema

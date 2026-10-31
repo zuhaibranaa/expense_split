@@ -1,13 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/constants/cloudinary_config.dart';
 import '../../../core/firebase/firebase_error_mapper.dart';
 import '../../../core/firebase/firestore_refs.dart';
 import '../../../shared/services/notification_service.dart';
@@ -18,16 +20,10 @@ import '../domain/user_model.dart';
 /// Session state is derived from `authStateChanges()`; nothing is persisted in
 /// SharedPreferences anymore.
 class AuthRepository {
-  AuthRepository(
-    this._auth,
-    this._refs,
-    this._storage,
-    this._notificationService,
-  );
+  AuthRepository(this._auth, this._refs, this._notificationService);
 
   final fb.FirebaseAuth _auth;
   final FirestoreRefs _refs;
-  final FirebaseStorage _storage;
   final NotificationService _notificationService;
 
   User? _currentUser;
@@ -327,20 +323,43 @@ class AuthRepository {
       throw Exception('You must be signed in to upload an avatar.');
     }
 
-    final bytes = await file.readAsBytes();
-    final extension = file.name.contains('.')
-        ? file.name.split('.').last.toLowerCase()
-        : 'jpg';
-    final contentType = switch (extension) {
-      'png' => 'image/png',
-      'webp' => 'image/webp',
-      'gif' => 'image/gif',
-      _ => 'image/jpeg',
-    };
+    if (!CloudinaryConfig.isConfigured) {
+      throw Exception(
+        'Avatar uploads are not configured. Set cloudName and '
+        'uploadPreset in lib/src/core/constants/cloudinary_config.dart '
+        '(D44).',
+      );
+    }
 
-    final ref = _storage.ref('avatars/${firebaseUser.uid}/profile.$extension');
-    await ref.putData(bytes, SettableMetadata(contentType: contentType));
-    final url = await ref.getDownloadURL();
+    final bytes = await file.readAsBytes();
+    final request =
+        http.MultipartRequest(
+            'POST',
+            Uri.parse(
+              'https://api.cloudinary.com/v1_1/'
+              '${CloudinaryConfig.cloudName}/image/upload',
+            ),
+          )
+          ..fields['upload_preset'] = CloudinaryConfig.uploadPreset
+          ..files.add(
+            http.MultipartFile.fromBytes(
+              'file',
+              bytes,
+              filename: file.name.isEmpty ? 'avatar.jpg' : file.name,
+            ),
+          );
+
+    final response = await request.send();
+    final body = await response.stream.bytesToString();
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Avatar upload failed (${response.statusCode}): $body');
+    }
+
+    final json = jsonDecode(body) as Map<String, dynamic>;
+    final url = json['secure_url'] as String?;
+    if (url == null || url.isEmpty) {
+      throw Exception('Cloudinary did not return an image URL.');
+    }
 
     await _refs.user(firebaseUser.uid).set({
       'avatarUrl': url,
@@ -424,7 +443,6 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(
     ref.watch(firebaseAuthProvider),
     ref.watch(firestoreRefsProvider),
-    ref.watch(firebaseStorageProvider),
     ref.watch(notificationServiceProvider),
   );
 });
